@@ -1,0 +1,55 @@
+# Human baseline report for cron_simple
+# Baseline scripts: human_baselines/cron_simple
+# Log file: data/logs/cron
+# Queries evaluated: 12
+
+ID: cron_query_1 | type: where | query: Find log lines showing cron job command executions.
+  script: human_baselines/cron_simple/cron_query_1.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2530 FP=0 FN=0 returned=2530 must=2530
+
+ID: cron_query_2 | type: where | query: Find log lines showing cron session openings.
+  script: human_baselines/cron_simple/cron_query_2.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5007 FP=0 FN=0 returned=5007 must=5007
+
+ID: cron_query_3 | type: where | query: Find log lines showing cron session closings.
+  script: human_baselines/cron_simple/cron_query_3.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5008 FP=0 FN=0 returned=5008 must=5008
+
+ID: cron_query_4 | type: where | query: Find log lines showing cron sessions opened for the root user.
+  script: human_baselines/cron_simple/cron_query_4.sh
+  precision=0.9998 recall=1.0000 f1=0.9999 TP=5006 FP=1 FN=0 returned=5007 must=5006
+
+ID: cron_query_5 | type: where | query: Find log lines showing cron job executions on July 14, 2017.
+  script: human_baselines/cron_simple/cron_query_5.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=83 FP=0 FN=0 returned=83 must=83
+
+ID: cron_query_6 | type: where | query: Find log lines mentioning the RANDOM_DELAY scaling factor.
+  script: human_baselines/cron_simple/cron_query_6.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+
+ID: cron_query_7 | type: where | query: Find log lines showing that the cron daemon started with inotify support.
+  script: human_baselines/cron_simple/cron_query_7.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+
+ID: cron_query_8 | type: where | query: Find all cron log lines from July 14, 2017 between 03:00 and 04:00.
+  script: human_baselines/cron_simple/cron_query_8.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=16 FP=0 FN=0 returned=16 must=16
+
+ID: cron_query_9 | type: where | query: Find all cron log lines with process ID 21832.
+  script: human_baselines/cron_simple/cron_query_9.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+
+ID: cron_select_1 | type: select | query: Find the distinct commands that were executed by cron jobs.
+  script: human_baselines/cron_simple/cron_select_1.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+
+ID: cron_select_2 | type: select | query: Find the usernames under which cron jobs were executed.
+  script: human_baselines/cron_simple/cron_select_2.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+
+ID: cron_select_3 | type: select | query: Find the distinct dates on which cron activity was logged.
+  script: human_baselines/cron_simple/cron_select_3.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=26 FP=0 FN=0 returned=26 must=26
+
+# Macro Averages
+# precision=1.0000 recall=1.0000 f1=1.0000

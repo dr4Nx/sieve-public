@@ -1,0 +1,394 @@
+# Evaluation report generated 20260429-124314
+# Source JSON: queries/sshd_simple.json
+# Log file input: data/logs/sshd
+# Log file resolved: data/logs/sshd
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/sshd_templates_20260429-124314.json
+# Queries evaluated: 12
+
+ID: sshd_query_1 | type: where | query: Find log lines recording SSH authentication failures, including Failed password, Invalid user, and PAM authentication failure events.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    log_path = sys.argv[1]
+    
+    # Match case-insensitively on the specified failure indicators
+    regex = re.compile(r'(?i)\b(Failed password|Invalid user|authentication failures?)\b')
+    
+    try:
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if regex.search(line):
+                    sys.stdout.write(line)
+    except Exception as e:
+        sys.stderr.write(f"Error reading {log_path}: {e}\n")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+  precision=0.9827 recall=1.0000 f1=0.9912 TP=2832 FP=50 FN=0 returned=2882 must=2832
+  may_precision=0.9827 may_recall=1.0000 may_f1=0.9912 may_TP=2832 may_FP=50 may_FN=0 may=2832
+  retries=1
+  input_tokens=27425 output_tokens=568
+  elapsed_seconds=63.34
+
+ID: sshd_query_2 | type: where | query: Find log lines showing successful SSH logins using password authentication.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+
+    file_path = sys.argv[1]
+    
+    # 'Accepted password' indicates a successful login using the SSH password authentication mechanism.
+    pattern = re.compile(r'\bAccepted password for \S+ from \S+ port \d+')
+
+    open_func = gzip.open if file_path.endswith('.gz') else open
+
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=636 FP=0 FN=0 returned=636 must=636
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=636 may_FP=0 may_FN=0 may=636
+  retries=0
+  input_tokens=13686 output_tokens=218
+  elapsed_seconds=28.57
+
+ID: sshd_query_3 | type: where | query: Find log lines showing successful SSH logins using public key authentication.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Determine the correct open function based on file extension
+    if file_path.endswith('.gz'):
+        open_func = gzip.open
+    else:
+        open_func = open
+        
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                # OpenSSH logs successful public key authentications with 'Accepted publickey'
+                if 'Accepted publickey for ' in line:
+                    sys.stdout.write(line)
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=207 FP=0 FN=0 returned=207 must=207
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=207 may_FP=0 may_FN=0 may=207
+  retries=0
+  input_tokens=13687 output_tokens=226
+  elapsed_seconds=20.39
+
+ID: sshd_query_4 | type: where | query: Find log lines where an SSH login was attempted with an invalid or unknown username.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_path = sys.argv[1]
+    pattern = re.compile(r'\b(?:[Ii]nvalid user|bad username|user unknown)\b')
+    
+    try:
+        with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except FileNotFoundError:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9567 recall=1.0000 f1=0.9779 TP=1327 FP=60 FN=0 returned=1387 must=1327
+  may_precision=0.9567 may_recall=1.0000 may_f1=0.9779 may_TP=1327 may_FP=60 may_FN=0 may=1327
+  retries=0
+  input_tokens=13691 output_tokens=169
+  elapsed_seconds=16.47
+
+ID: sshd_query_5 | type: where | query: Find log lines showing SSH session openings.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    
+    log_path = sys.argv[1]
+    
+    try:
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                # Check for PAM session opening messages
+                if 'session opened for user ' in line:
+                    sys.stdout.write(line)
+    except IOError as e:
+        sys.stderr.write(f"Error reading file: {e}\n")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=13244 FP=0 FN=0 returned=13244 must=13244
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=13244 may_FP=0 may_FN=0 may=13244
+  retries=0
+  input_tokens=13683 output_tokens=181
+  elapsed_seconds=15.85
+
+ID: sshd_query_6 | type: where | query: Find log lines showing SSH session closings.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def filter_logs(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'session closed' in line.lower():
+                    sys.stdout.write(line)
+    except Exception as e:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        filter_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=12797 FP=0 FN=0 returned=12797 must=12797
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=12797 may_FP=0 may_FN=0 may=12797
+  retries=1
+  input_tokens=27401 output_tokens=370
+  elapsed_seconds=45.1
+
+ID: sshd_query_7 | type: where | query: Find log lines showing SSH network-level disconnection events.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    
+    file_path = sys.argv[1]
+    
+    # Patterns for SSH network-level disconnection events
+    disconnect_patterns = [
+        re.compile(r'\bConnection closed by\b'),
+        re.compile(r'\bReceived disconnect from\b'),
+        re.compile(r'\bConnection reset by peer\b')
+    ]
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if any(p.search(line) for p in disconnect_patterns):
+                    sys.stdout.write(line)
+    except Exception as e:
+        sys.stderr.write(f"Error reading file: {e}\n")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.9390 f1=0.9686 TP=154 FP=0 FN=10 returned=154 must=164
+  may_precision=1.0000 may_recall=0.9390 may_f1=0.9686 may_TP=154 may_FP=0 may_FN=10 may=164
+  retries=0
+  input_tokens=13686 output_tokens=260
+  elapsed_seconds=25.33
+
+ID: sshd_query_8 | type: where | query: Find log lines showing the SSH server starting and listening on a port.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_file(file_path):
+    regex = re.compile(r"Server listening on \S+ port \d+\.")
+    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if regex.search(line):
+                print(line, end="")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.9950 recall=1.0000 f1=0.9975 TP=399 FP=2 FN=0 returned=401 must=399
+  may_precision=0.9950 may_recall=1.0000 may_f1=0.9975 may_TP=399 may_FP=2 may_FN=0 may=399
+  retries=0
+  input_tokens=13689 output_tokens=142
+  elapsed_seconds=12.47
+
+ID: sshd_query_9 | type: where | query: Find log lines reporting deprecated SSH configuration options.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def process_file(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if "Deprecated option" in line:
+                    sys.stdout.write(line)
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2023 FP=0 FN=0 returned=2023 must=2023
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2023 may_FP=0 may_FN=0 may=2023
+  retries=1
+  input_tokens=27401 output_tokens=320
+  elapsed_seconds=34.79
+
+ID: sshd_select_1 | type: select | query: Find the source IP addresses or hostnames that caused SSH authentication failures (including Failed password, Invalid user, and unknown user attempts).
+  requested output format=source
+  requested output data type=string
+  command: import sys
+import re
+
+def process_logs(file_path):
+    rhost_re = re.compile(r'rhost=([^\s]+)')
+    failed_re = re.compile(r'Failed \S+ for .*? from ([^\s]+)')
+    invalid_user_re = re.compile(r'[Ii]nvalid user .*? from ([^\s]+)')
+    unknown_user_re = re.compile(r'[Uu]nknown user .*? from ([^\s]+)')
+
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                source = None
+                if 'authentication failure' in line or 'authentication failures' in line:
+                    m = rhost_re.search(line)
+                    if m:
+                        val = m.group(1)
+                        if not val.startswith('user='):
+                            source = val
+                
+                if not source and 'Failed ' in line:
+                    m = failed_re.search(line)
+                    if m:
+                        source = m.group(1)
+                        
+                if not source and 'nvalid user ' in line:
+                    m = invalid_user_re.search(line)
+                    if m:
+                        source = m.group(1)
+                        
+                if not source and 'nknown user ' in line:
+                    m = unknown_user_re.search(line)
+                    if m:
+                        source = m.group(1)
+                
+                if source:
+                    print(source)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=0.8901 recall=1.0000 f1=0.9419 TP=81 FP=10 FN=0 returned=91 must=81
+  may_precision=0.8901 may_recall=1.0000 may_f1=0.9419 may_TP=81 may_FP=10 may_FN=0 may=81
+  retries=1
+  input_tokens=27767 output_tokens=880
+  elapsed_seconds=134.78
+
+ID: sshd_select_2 | type: select | query: Find the usernames that were targeted in SSH authentication failure attempts (including Failed password, Invalid user, and unknown user attempts).
+  requested output format=username
+  requested output data type=string
+  command: import sys
+import re
+
+def process_file(file_path):
+    regexes = [
+        re.compile(r"authentication failure(?:s)?;.*?\buser=([^\s]+)"),
+        re.compile(r"Failed [^\s]+ for (?:(?:invalid|unknown|illegal) user )?([^\s]+) from"),
+        re.compile(r"(?:[Ii]nvalid|[Uu]nknown|[Ii]llegal) user ([^\s]+)"),
+        re.compile(r"bad username \[([^\]]+)\]"),
+        re.compile(r"Too many authentication failures for (?:(?:invalid|unknown|illegal) user )?([^\s]+)")
+    ]
+    
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            for r in regexes:
+                m = r.search(line)
+                if m:
+                    print(m.group(1))
+                    break
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.9333 recall=1.0000 f1=0.9655 TP=56 FP=4 FN=0 returned=60 must=56
+  may_precision=0.9333 may_recall=1.0000 may_f1=0.9655 may_TP=56 may_FP=4 may_FN=0 may=56
+  retries=0
+  input_tokens=13865 output_tokens=299
+  elapsed_seconds=75.22
+
+ID: sshd_select_3 | type: select | query: Find the ports on which the SSH server was configured to listen.
+  requested output format=port
+  requested output data type=integer
+  command: import sys
+import re
+
+def parse_file(file_path):
+    listen_pattern = re.compile(r'Server listening on \S+ port (\d+)')
+    bind_pattern = re.compile(r'Bind to port (\d+) on \S+ failed')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                m_listen = listen_pattern.search(line)
+                if m_listen:
+                    print(m_listen.group(1))
+                    continue
+                
+                m_bind = bind_pattern.search(line)
+                if m_bind:
+                    print(m_bind.group(1))
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        parse_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6 FP=0 FN=0 returned=6 must=6
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=6 may_FP=0 may_FN=0 may=6
+  retries=1
+  input_tokens=27741 output_tokens=488
+  elapsed_seconds=54.6
+
+# Macro Averages (where/select queries)
+# precision=0.9798 recall=0.9949 f1=0.9869
+# may_precision=0.9798 may_recall=0.9949 may_f1=0.9869
+# retries_total=5 retries_avg=0.42
+# total_input_tokens=233722 total_output_tokens=4121
+# total_elapsed=526.91s avg_elapsed=43.91s
+# Worst 5 queries by f1
+# 1. sshd_select_1 | type: select | f1=0.9419 | query: Find the source IP addresses or hostnames that caused SSH authentication failures (including Failed password, Invalid user, and unknown user attempts).
+# 2. sshd_select_2 | type: select | f1=0.9655 | query: Find the usernames that were targeted in SSH authentication failure attempts (including Failed password, Invalid user, and unknown user attempts).
+# 3. sshd_query_7 | type: where | f1=0.9686 | query: Find log lines showing SSH network-level disconnection events.
+# 4. sshd_query_4 | type: where | f1=0.9779 | query: Find log lines where an SSH login was attempted with an invalid or unknown username.
+# 5. sshd_query_1 | type: where | f1=0.9912 | query: Find log lines recording SSH authentication failures, including Failed password, Invalid user, and PAM authentication failure events.

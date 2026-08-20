@@ -1,0 +1,408 @@
+# Evaluation report generated 20260429-121752
+# Source JSON: queries/cron_simple.json
+# Log file input: data/logs/cron
+# Log file resolved: data/logs/cron
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Queries evaluated: 12
+
+ID: cron_query_1 | type: where | query: Find log lines showing cron job command executions.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+import re
+
+def process_file(filepath):
+    opener = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with opener(filepath, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                # Match standard cron CMD log entries, e.g., "CRON[pid]: (user) CMD (command)"
+                if re.search(r'\bCMD\s*\(', line):
+                    print(line, end='')
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=5007 FN=2530 returned=5007 must=2530
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=5007 may_FN=2530 may=2530
+  retries=0
+  input_tokens=6877 output_tokens=193
+  elapsed_seconds=14.14
+
+ID: cron_query_2 | type: where | query: Find log lines showing cron session openings.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+
+def process_file(filepath):
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if 'session opened' in line:
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=1 FN=5007 returned=1 must=5007
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=1 may_FN=5007 may=5007
+  retries=0
+  input_tokens=6876 output_tokens=156
+  elapsed_seconds=14.23
+
+ID: cron_query_3 | type: where | query: Find log lines showing cron session closings.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    file_path = sys.argv[1]
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'session closed' in line:
+                    print(line, end='')
+    except Exception as e:
+        sys.stderr.write(f"Error reading file: {e}\n")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5008 FP=0 FN=0 returned=5008 must=5008
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5008 may_FP=0 may_FN=0 may=5008
+  retries=0
+  input_tokens=6877 output_tokens=193
+  elapsed_seconds=14.2
+
+ID: cron_query_4 | type: where | query: Find log lines showing cron sessions opened for the root user.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def process_file(file_path):
+    # Pattern to match session opened specifically for root
+    root_session_pattern = re.compile(r'\bsession opened for user root\b')
+    # Ensure it's a cron log line (case-insensitive for CRON/cron/crond)
+    cron_pattern = re.compile(r'\bcron', re.IGNORECASE)
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if cron_pattern.search(line) and root_session_pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.9998 recall=1.0000 f1=0.9999 TP=5006 FP=1 FN=0 returned=5007 must=5006
+  may_precision=0.9998 may_recall=1.0000 may_f1=0.9999 may_TP=5006 may_FP=1 may_FN=0 may=5006
+  retries=0
+  input_tokens=6880 output_tokens=267
+  elapsed_seconds=22.06
+
+ID: cron_query_5 | type: where | query: Find cron command-execution log lines on July 14, 2017.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if '2017-07-14T' in line[:30] and ' CMD ' in line and ('CRON' in line or 'cron' in line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=83 returned=0 must=83
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=0 may_FN=83 may=83
+  retries=0
+  input_tokens=6887 output_tokens=160
+  elapsed_seconds=29.57
+
+ID: cron_query_6 | type: where | query: Find log lines mentioning the RANDOM_DELAY scaling factor.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    pattern = re.compile(r'\bRANDOM_DELAY\b')
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1 may_FP=0 may_FN=0 may=1
+  retries=0
+  input_tokens=6879 output_tokens=193
+  elapsed_seconds=14.25
+
+ID: cron_query_7 | type: where | query: Find log lines showing that the cron daemon started with inotify support.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    if file_path.endswith('.gz'):
+        opener = gzip.open
+    else:
+        opener = open
+        
+    pattern = re.compile(r'inotify support', re.IGNORECASE)
+    
+    try:
+        with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1 may_FP=0 may_FN=0 may=1
+  retries=0
+  input_tokens=6883 output_tokens=200
+  elapsed_seconds=14.75
+
+ID: cron_query_8 | type: where | query: Find all cron log lines from July 14, 2017 between 03:00 and 04:00.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    filepath = sys.argv[1]
+    
+    patterns = [
+        re.compile(r'^(?:<\d+>)?\s*2017-07-14[T\s]03:\d{2}:\d{2}'),
+        re.compile(r'^(?:<\d+>)?\s*2017-07-14[T\s]04:00:00(?:\.0+)?(?:[+-]\d{2}:\d{2}|Z)?(?:\s|$)'),
+        re.compile(r'^(?:<\d+>)?\s*Jul\s+14\s+03:\d{2}:\d{2}'),
+        re.compile(r'^(?:<\d+>)?\s*Jul\s+14\s+04:00:00(?:\s|$)')
+    ]
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if any(p.match(line) for p in patterns):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=16 FP=0 FN=0 returned=16 must=16
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=16 may_FP=0 may_FN=0 may=16
+  retries=0
+  input_tokens=6899 output_tokens=378
+  elapsed_seconds=69.85
+
+ID: cron_query_9 | type: where | query: Find all cron log lines with process ID 21832.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    # Match 21832 as a distinct word boundary (supports optional brackets/decorations)
+    pattern = re.compile(r'\b21832\b')
+    
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=1
+  input_tokens=13799 output_tokens=386
+  elapsed_seconds=68.07
+
+ID: cron_select_1 | type: select | query: Find the distinct commands that were executed by cron jobs.
+  requested output format=command
+  requested output data type=string
+  command: import sys
+import re
+
+def process_logs(file_path):
+    commands = set()
+    
+    # Pattern to extract the command executed by cron
+    cmd_pattern = re.compile(r'\bCMD\s*\(\s*(?P<cmd>.*?)\s*\)')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'CMD' not in line:
+                    continue
+                
+                # Ensure this is actually a cron log line
+                if not re.search(r'\b(?:CRON|cron)\b', line, re.IGNORECASE):
+                    continue
+                
+                # Intermediate record for structured state
+                record = {}
+                cmd_match = cmd_pattern.search(line)
+                if cmd_match:
+                    record['command'] = cmd_match.group('cmd').strip()
+                    
+                if 'command' in record and record['command']:
+                    commands.add(record['command'])
+                        
+        # Emit distinct commands sorted alphabetically, one per line
+        for cmd in sorted(commands):
+            print(cmd)
+            
+    except Exception as e:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=0
+  input_tokens=7045 output_tokens=356
+  elapsed_seconds=38.67
+
+ID: cron_select_2 | type: select | query: Find the usernames under which cron jobs were executed.
+  requested output format=username
+  requested output data type=string
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    filepath = sys.argv[1]
+    
+    session_re = re.compile(r'session (?:opened|closed) for user (\S+)')
+    cmd_re = re.compile(r'(?i)cron(?:d)?(?:\[\d+\])?:\s*\(([^)]+)\)\s*CMD')
+    
+    try:
+        open_func = gzip.open if filepath.endswith('.gz') else open
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m_session = session_re.search(line)
+                if m_session:
+                    print(m_session.group(1))
+                    continue
+                m_cmd = cmd_re.search(line)
+                if m_cmd:
+                    print(m_cmd.group(1))
+                    continue
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1 may_FP=0 may_FN=0 may=1
+  retries=0
+  input_tokens=7044 output_tokens=293
+  elapsed_seconds=41.7
+
+ID: cron_select_3 | type: select | query: Find the distinct dates on which cron activity was logged.
+  requested output format=date
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_file = sys.argv[1]
+    dates = set()
+    
+    pattern = re.compile(r'^\s*\[?(\d{4}-\d{2}-\d{2})[T\s]')
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if 'cron' in line.lower():
+                    match = pattern.search(line)
+                    if match:
+                        dates.add(match.group(1))
+    except FileNotFoundError:
+        pass
+        
+    for d in sorted(dates):
+        print(d)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=26 FP=0 FN=0 returned=26 must=26
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=26 may_FP=0 may_FN=0 may=26
+  retries=0
+  input_tokens=7045 output_tokens=226
+  elapsed_seconds=29.63
+
+# Macro Averages (where/select queries)
+# precision=0.7500 recall=0.7500 f1=0.7500
+# may_precision=0.7500 may_recall=0.7500 may_f1=0.7500
+# retries_total=1 retries_avg=0.08
+# total_input_tokens=89991 total_output_tokens=3001
+# total_elapsed=371.12s avg_elapsed=30.93s
+# Worst 5 queries by f1
+# 1. cron_query_1 | type: where | f1=0.0000 | query: Find log lines showing cron job command executions.
+# 2. cron_query_2 | type: where | f1=0.0000 | query: Find log lines showing cron session openings.
+# 3. cron_query_5 | type: where | f1=0.0000 | query: Find cron command-execution log lines on July 14, 2017.
+# 4. cron_query_4 | type: where | f1=0.9999 | query: Find log lines showing cron sessions opened for the root user.
+# 5. cron_query_3 | type: where | f1=1.0000 | query: Find log lines showing cron session closings.

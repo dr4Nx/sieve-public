@@ -1,0 +1,206 @@
+# Evaluation report generated 20260429-132050
+# Source JSON: queries/cron_simple.json
+# Log file input: data/logs/cron
+# Log file resolved: data/logs/cron
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/cron.json
+# Queries evaluated: 12
+
+ID: cron_query_1 | type: where | query: Find log lines showing cron job command executions.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/ CMD \(/ {print}' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2530 FP=0 FN=0 returned=2530 must=2530
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2530 may_FP=0 may_FN=0 may=2530
+  retries=0
+  input_tokens=7564 output_tokens=42
+  elapsed_seconds=16.57
+
+ID: cron_query_2 | type: where | query: Find log lines showing cron session openings.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/session opened/' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5007 FP=0 FN=0 returned=5007 must=5007
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5007 may_FP=0 may_FN=0 may=5007
+  retries=0
+  input_tokens=7563 output_tokens=29
+  elapsed_seconds=8.62
+
+ID: cron_query_3 | type: where | query: Find log lines showing cron session closings.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/session closed/' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5008 FP=0 FN=0 returned=5008 must=5008
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5008 may_FP=0 may_FN=0 may=5008
+  retries=0
+  input_tokens=7564 output_tokens=29
+  elapsed_seconds=9.62
+
+ID: cron_query_4 | type: where | query: Find log lines showing cron sessions opened for the root user.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Find log lines indicating a session opened for the root user
+/session opened for user root / {
+    print $0
+}
+' data/logs/cron
+  precision=0.9998 recall=1.0000 f1=0.9999 TP=5006 FP=1 FN=0 returned=5007 must=5006
+  may_precision=0.9998 may_recall=1.0000 may_f1=0.9999 may_TP=5006 may_FP=1 may_FN=0 may=5006
+  retries=0
+  input_tokens=7567 output_tokens=59
+  elapsed_seconds=17.42
+
+ID: cron_query_5 | type: where | query: Find cron command-execution log lines on July 14, 2017.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+BEGIN {
+    # Timeline starts in 2000
+    year = "2000"
+}
+{
+    # Track explicit year from ISO timestamps
+    if ($0 ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T/) {
+        year = substr($0, 1, 4)
+    }
+    
+    # Determine if line belongs to July 14, 2017
+    is_target_date = 0
+    if ($0 ~ /^2017-07-14/) {
+        is_target_date = 1
+    } else if ($0 ~ /^Jul  *14 / && year == "2017") {
+        is_target_date = 1
+    }
+    
+    # Match command-execution log lines
+    if (is_target_date && $0 ~ / CMD \(/) {
+        print $0
+    }
+}' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=83 FP=0 FN=0 returned=83 must=83
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=83 may_FP=0 may_FN=0 may=83
+  retries=0
+  input_tokens=7574 output_tokens=270
+  elapsed_seconds=60.41
+
+ID: cron_query_6 | type: where | query: Find log lines mentioning the RANDOM_DELAY scaling factor.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/RANDOM_DELAY/' data/logs/cron
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=1 FN=1 returned=1 must=1
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=1 may_FN=1 may=1
+  retries=0
+  input_tokens=7566 output_tokens=31
+  elapsed_seconds=8.37
+
+ID: cron_query_7 | type: where | query: Find log lines showing that the cron daemon started with inotify support.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/running with inotify support/' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1 may_FP=0 may_FN=0 may=1
+  retries=0
+  input_tokens=7570 output_tokens=33
+  elapsed_seconds=8.37
+
+ID: cron_query_8 | type: where | query: Find all cron log lines from July 14, 2017 between 03:00 and 04:00.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/^(2017-07-14T|Jul  *14 )(03:|04:00:00)/' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=16 FP=0 FN=0 returned=16 must=16
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=16 may_FP=0 may_FN=0 may=16
+  retries=0
+  input_tokens=7586 output_tokens=58
+  elapsed_seconds=31.62
+
+ID: cron_query_9 | type: where | query: Find all cron log lines with process ID 21832.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match the specific process ID 21832 enclosed in square brackets to avoid partial matches elsewhere
+/\[21832\]/ {
+    print $0
+}' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=7570 output_tokens=79
+  elapsed_seconds=15.79
+
+ID: cron_select_1 | type: select | query: Find the distinct commands that were executed by cron jobs.
+  requested output format=command
+  requested output data type=string
+  command: awk 'match($0, / CMD \(/) { cmd = substr($0, RSTART + RLENGTH); sub(/\)[ \t]*$/, "", cmd); sub(/^[ \t]+/, "", cmd); sub(/[ \t]+$/, "", cmd); if (!seen[cmd]++) print cmd }' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=0
+  input_tokens=7732 output_tokens=92
+  elapsed_seconds=42.85
+
+ID: cron_select_2 | type: select | query: Find the usernames under which cron jobs were executed.
+  requested output format=username
+  requested output data type=string
+  command: awk '
+# Match pam_unix session opened/closed events for users
+/session (opened|closed) for user / {
+    if (match($0, /user +[^ \r\n\t]+/)) {
+        u = substr($0, RSTART, RLENGTH)
+        sub(/^user +/, "", u)
+        users[u] = 1
+    }
+}
+# Match explicit CMD execution events which contain the user in parentheses
+/\[[0-9]+\]:[ \t]*\([^)]+\)[ \t]*CMD/ {
+    if (match($0, /\[[0-9]+\]:[ \t]*\([^)]+\)[ \t]*CMD/)) {
+        u = substr($0, RSTART, RLENGTH)
+        sub(/^[^(]*\(/, "", u)
+        sub(/\).*$/, "", u)
+        users[u] = 1
+    }
+}
+END {
+    # Print uniquely identified users
+    for (u in users) {
+        if (u != "") print u
+    }
+}' data/logs/cron
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1 FP=0 FN=0 returned=1 must=1
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1 may_FP=0 may_FN=0 may=1
+  retries=0
+  input_tokens=7731 output_tokens=285
+  elapsed_seconds=100.52
+
+ID: cron_select_3 | type: select | query: Find the distinct dates on which cron activity was logged.
+  requested output format=date
+  requested output data type=string
+  command: awk '{
+    # Check for ISO 8601-like timestamp
+    if ($1 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/) {
+        date = substr($1, 1, 10)
+    }
+    # Check for syslog-style timestamp (e.g., Sep 3)
+    else if ($1 ~ /^[A-Za-z]{3}$/ && $2 ~ /^[0-9]+$/) {
+        date = $1 " " $2
+    }
+    else {
+        next
+    }
+
+    # Print distinct dates
+    if (!seen[date]++) {
+        print date
+    }
+}' data/logs/cron
+  precision=0.9630 recall=1.0000 f1=0.9811 TP=26 FP=1 FN=0 returned=27 must=26
+  may_precision=0.9630 may_recall=1.0000 may_f1=0.9811 may_TP=26 may_FP=1 may_FN=0 may=26
+  retries=0
+  input_tokens=7732 output_tokens=192
+  elapsed_seconds=14.56
+
+# Macro Averages (where/select queries)
+# precision=0.9136 recall=0.9167 f1=0.9151
+# may_precision=0.9136 may_recall=0.9167 may_f1=0.9151
+# retries_total=0 retries_avg=0.00
+# total_input_tokens=91319 total_output_tokens=1199
+# total_elapsed=334.72s avg_elapsed=27.89s
+# Worst 5 queries by f1
+# 1. cron_query_6 | type: where | f1=0.0000 | query: Find log lines mentioning the RANDOM_DELAY scaling factor.
+# 2. cron_select_3 | type: select | f1=0.9811 | query: Find the distinct dates on which cron activity was logged.
+# 3. cron_query_4 | type: where | f1=0.9999 | query: Find log lines showing cron sessions opened for the root user.
+# 4. cron_query_1 | type: where | f1=1.0000 | query: Find log lines showing cron job command executions.
+# 5. cron_query_2 | type: where | f1=1.0000 | query: Find log lines showing cron session openings.

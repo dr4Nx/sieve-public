@@ -1,0 +1,507 @@
+# Evaluation report generated 20260429-143048
+# Source JSON: queries/dhcp_simple.json
+# Log file input: data/logs/dhcp
+# Log file resolved: data/logs/dhcp
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/dhcp_v2.json
+# Queries evaluated: 32
+
+ID: dhcp_query_1 | type: where | query: Return lines assigning an IP to host laphroaig
+  output_format_note=ignored output_format for query_type=where
+  command: awk '$4 == "laphroaig" && /bound to /' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=23 FP=0 FN=0 returned=23 must=23
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=23 may_FP=0 may_FN=0 may=23
+  retries=0
+  input_tokens=20172 output_tokens=41
+  elapsed_seconds=19.1
+
+ID: dhcp_query_2 | type: where | query: Return log lines reporting DHCP server IP addresses that are not broadcast addresses
+  output_format_note=ignored output_format for query_type=where
+  command: awk '{
+    temp = $0
+    # Remove IPv4 broadcast address to filter it out
+    gsub(/(to|from) 255\.255\.255\.255/, "", temp)
+    
+    # Check if the line still reports a DHCP server IP (after removing broadcasts)
+    if (temp ~ /(DHCPACK|DHCPOFFER|DHCPNAK) from [0-9a-fA-F:.]+/ ||
+        temp ~ /(Reply|Advertise) message on [^ ]+ from [0-9a-fA-F:.]+/ ||
+        temp ~ /DHCP(REQUEST|DISCOVER|RELEASE|DECLINE) on [^ ]+ to [0-9a-fA-F:.]+/) {
+        print
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=0.9994 f1=0.9997 TP=152602 FP=0 FN=88 returned=152602 must=152690
+  may_precision=1.0000 may_recall=0.9994 may_f1=0.9997 may_TP=152602 may_FP=0 may_FN=88 may=152690
+  retries=0
+  input_tokens=20174 output_tokens=223
+  elapsed_seconds=100.6
+
+ID: dhcp_query_3 | type: where | query: Return all log lines for transaction ID 0x6520bf0e
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+BEGIN {
+    # Set the target transaction ID
+    target = "0x6520bf0e"
+}
+{
+    # Field 4 is the host, Field 5 contains process/PID
+    host = $4
+    pid = "NONE"
+    
+    # Extract PID if present in Field 5 (e.g., dhclient[123]:)
+    if (match($5, /\[[0-9]+\]/)) {
+        pid = substr($5, RSTART+1, RLENGTH-2)
+    }
+    
+    # Create a unique key for the client process
+    key = host SUBSEP pid
+
+    # Update the current transaction ID for this client if an xid is logged
+    if (match($0, /xid=0x[0-9a-fA-F]+/)) {
+        current_xid[key] = substr($0, RSTART+4, RLENGTH-4)
+    }
+
+    # Print the line if it explicitly contains the target ID or belongs to a client currently processing it
+    if (index($0, target) > 0 || current_xid[key] == target) {
+        print $0
+    }
+}
+' data/logs/dhcp
+  precision=0.9973 recall=1.0000 f1=0.9987 TP=4100 FP=11 FN=0 returned=4111 must=4100
+  may_precision=0.9973 may_recall=1.0000 may_f1=0.9987 may_TP=4100 may_FP=11 may_FN=0 may=4100
+  retries=0
+  input_tokens=20178 output_tokens=317
+  elapsed_seconds=108.09
+
+ID: dhcp_query_4 | type: where | query: Get all lines reporting MAC addresses for host laphroaig
+  output_format_note=ignored output_format for query_type=where
+  command: awk '$4 == "laphroaig" && $0 ~ "LPF/[^/]+/[0-9a-fA-F][0-9a-fA-F]?:[0-9a-fA-F][0-9a-fA-F]?:[0-9a-fA-F][0-9a-fA-F]?:[0-9a-fA-F][0-9a-fA-F]?:[0-9a-fA-F][0-9a-fA-F]?:[0-9a-fA-F][0-9a-fA-F]?"' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=46 FP=0 FN=0 returned=46 must=46
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=46 may_FP=0 may_FN=0 may=46
+  retries=0
+  input_tokens=20173 output_tokens=189
+  elapsed_seconds=54.43
+
+ID: dhcp_query_5 | type: where | query: List all log lines reporting IP assignments with lease durations over a day
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/bound.*renewal in [0-9]+/ { match($0, /renewal in [0-9]+/); val = substr($0, RSTART+11, RLENGTH-11); if (val + 0 > 86400) print }' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2998 FP=0 FN=0 returned=2998 must=2998
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2998 may_FP=0 may_FN=0 may=2998
+  retries=0
+  input_tokens=20174 output_tokens=85
+  elapsed_seconds=39.99
+
+ID: dhcp_query_6 | type: where | query: List all log lines reporting DHCP destination IPs running on non standard ports
+  output_format_note=ignored output_format for query_type=where
+  command: awk '{
+    for (i = 1; i <= NF - 3; i++) {
+        if ($i == "to" && $(i+2) == "port") {
+            port = $(i+3)
+            # Strip non-numeric characters safely
+            sub(/[^0-9].*/, "", port)
+            if (port != "") {
+                p = port + 0
+                # Standard DHCP ports are 67, 68, 546, and 547
+                if (p != 67 && p != 68 && p != 546 && p != 547) {
+                    print $0
+                    next
+                }
+            }
+        }
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=0.8889 f1=0.9412 TP=8 FP=0 FN=1 returned=8 must=9
+  may_precision=1.0000 may_recall=0.8889 may_f1=0.9412 may_TP=8 may_FP=0 may_FN=1 may=9
+  retries=1
+  input_tokens=40493 output_tokens=357
+  elapsed_seconds=86.99
+
+ID: dhcp_query_7 | type: where | query: List all log lines reporting hosts using client version 3.0.1
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/dhclient(\[[0-9]+\])?:[ \t]+(Internet Systems Consortium DHCP Client |isc-dhclient-)[Vv]?3\.0\.1([^0-9.]|$)/' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5 FP=0 FN=0 returned=5 must=5
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5 may_FP=0 may_FN=0 may=5
+  retries=1
+  input_tokens=40429 output_tokens=139
+  elapsed_seconds=72.45
+
+ID: dhcp_query_8 | type: where | query: List all log lines reporting DHCPDISCOVER messages
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/(^|[^a-zA-Z0-9_])DHCPDISCOVER([^a-zA-Z0-9_]|$)/' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=37738 FP=0 FN=0 returned=37738 must=37738
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=37738 may_FP=0 may_FN=0 may=37738
+  retries=0
+  input_tokens=20170 output_tokens=58
+  elapsed_seconds=18.04
+
+ID: dhcp_query_9 | type: where | query: List all log lines reporting XMT Renew messages
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/XMT:? Renew/' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=0
+  input_tokens=20170 output_tokens=33
+  elapsed_seconds=11.61
+
+ID: dhcp_query_10 | type: where | query: Return logs reporting bad IP checksums
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/bad IP checksums/' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=8 FP=0 FN=0 returned=8 must=8
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=8 may_FP=0 may_FN=0 may=8
+  retries=0
+  input_tokens=20168 output_tokens=35
+  elapsed_seconds=8.55
+
+ID: dhcp_select_1 | type: select | query: Return DHCP server IP addresses that are not broadcast addresses
+  requested output format=server_ip
+  requested output data type=string
+  command: awk '{
+    line = $0
+    while (match(line, /DHCP(ACK|OFFER|NAK) from [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)) {
+        split(substr(line, RSTART, RLENGTH), a)
+        if (a[3] != "255.255.255.255") print a[3]
+        line = substr(line, RSTART + RLENGTH)
+    }
+    line = $0
+    while (match(line, /DHCP(REQUEST|DISCOVER|RELEASE|DECLINE) on [^ ]+ to [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)) {
+        split(substr(line, RSTART, RLENGTH), a)
+        if (a[5] != "255.255.255.255") print a[5]
+        line = substr(line, RSTART + RLENGTH)
+    }
+    line = $0
+    while (match(line, /RCV: (Reply|Advertise) message on [^ ]+ from [0-9a-fA-F:]+/)) {
+        split(substr(line, RSTART, RLENGTH), a)
+        print a[7]
+        line = substr(line, RSTART + RLENGTH)
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=0.9786 f1=0.9892 TP=825 FP=0 FN=18 returned=825 must=843
+  may_precision=1.0000 may_recall=0.9786 may_f1=0.9892 may_TP=825 may_FP=0 may_FN=18 may=843
+  retries=0
+  input_tokens=20341 output_tokens=356
+  elapsed_seconds=93.47
+
+ID: dhcp_select_2 | type: select | query: Find the MAC addresses reported for host laphroaig
+  requested output format=mac_address
+  requested output data type=string
+  command: awk '
+# Check if the 4th field (host) is exactly "laphroaig"
+$4 == "laphroaig" {
+    # Match standard 6-byte (or longer) colon-separated hex MAC addresses
+    if (match($0, /[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F](:[0-9a-fA-F][0-9a-fA-F])*/)) {
+        # Extract and print the exact matched MAC address
+        print substr($0, RSTART, RLENGTH)
+    }
+}
+' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=20342 output_tokens=278
+  elapsed_seconds=121.94
+
+ID: dhcp_select_3 | type: select | query: Return all IPs that were assigned with lease durations over a day
+  command: awk '
+# Match lines that indicate an IP was bound and specify a renewal duration
+/bound to/ && /renewal in/ {
+    ip = ""
+    dur = 0
+    
+    # Iterate through fields to safely extract the IP and the duration in seconds
+    for (i = 1; i <= NF; i++) {
+        if ($i == "bound" && $(i+1) == "to") {
+            ip = $(i+2)
+        }
+        if ($i == "renewal" && $(i+1) == "in") {
+            dur = $(i+2) + 0
+        }
+    }
+    
+    # A day is 86400 seconds. If duration > 86400 and IP is populated (not "--"), print if not seen yet.
+    if (dur > 86400 && ip != "" && ip != "--" && !seen[ip]++) {
+        print ip
+    }
+}
+' data/logs/dhcp
+  precision=1.0000 recall=0.9970 f1=0.9985 TP=336 FP=0 FN=1 returned=336 must=337
+  may_precision=1.0000 may_recall=0.9970 may_f1=0.9985 may_TP=336 may_FP=0 may_FN=1 may=337
+  retries=0
+  input_tokens=20173 output_tokens=269
+  elapsed_seconds=42.3
+
+ID: dhcp_select_4 | type: select | query: Find the unique DHCP destination IPs used with non-standard ports
+  requested output format=destination_ip
+  requested output data type=string
+  command: awk '{
+    # Iterate through fields to find "to <IP> port <PORT>"
+    for (i=1; i<=NF-3; i++) {
+        if ($i == "to" && $(i+2) == "port") {
+            ip = $(i+1)
+            port = $(i+3)
+            # Remove any trailing non-digit characters from the port
+            sub(/[^0-9].*/, "", port)
+            # Check if the port is a non-standard DHCP port (standard: 67, 68, 546, 547)
+            if (port != "" && port != "67" && port != "68" && port != "546" && port != "547") {
+                # Print unique destination IPs
+                if (!seen[ip]++) {
+                    print ip
+                }
+            }
+        }
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=0.6667 f1=0.8000 TP=2 FP=0 FN=1 returned=2 must=3
+  may_precision=1.0000 may_recall=0.6667 may_f1=0.8000 may_TP=2 may_FP=0 may_FN=1 may=3
+  retries=0
+  input_tokens=20343 output_tokens=244
+  elapsed_seconds=39.31
+
+ID: dhcp_select_5 | type: select | query: Find the hosts using DHCP client version 3.0.1
+  requested output format=hostname
+  requested output data type=string
+  command: awk '/(Internet Systems Consortium DHCP Client |isc-dhclient-)V?3\.0\.1([^0-9]|$)/ { print $4 }' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=20340 output_tokens=59
+  elapsed_seconds=34.37
+
+ID: dhcp_select_6 | type: select | query: List all hosts which sent a DHCPDISCOVER messages
+  command: awk '
+# Search for DHCPDISCOVER in the log
+/DHCPDISCOVER/ {
+    # Field 4 is the host. Print unique occurrences.
+    if (!seen[$4]++) {
+        print $4
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=647 FP=0 FN=0 returned=647 must=647
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=647 may_FP=0 may_FN=0 may=647
+  retries=0
+  input_tokens=20171 output_tokens=81
+  elapsed_seconds=34.07
+
+ID: dhcp_select_7 | type: select | query: Find the unique hosts reporting an XMT Renew message
+  requested output format=hostname
+  requested output data type=string
+  command: awk '/XMT: Renew/ && !seen[$4]++ { print $4 }' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=20337 output_tokens=44
+  elapsed_seconds=13.22
+
+ID: simple_1 | type: where | query: Show all DHCPACK messages
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/DHCPACK/' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=35522 FP=0 FN=0 returned=35522 must=35522
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=35522 may_FP=0 may_FN=0 may=35522
+  retries=0
+  input_tokens=20166 output_tokens=31
+  elapsed_seconds=14.74
+
+ID: simple_2 | type: where | query: Find logs from interface eth0
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines containing "eth0" as a whole word to avoid matching "veth0" or "eth01"
+/(^|[^a-zA-Z0-9_])eth0([^a-zA-Z0-9_]|$)/ {
+    print $0
+}
+' data/logs/dhcp
+  precision=0.9973 recall=1.0000 f1=0.9987 TP=69491 FP=186 FN=0 returned=69677 must=69491
+  may_precision=0.9973 may_recall=1.0000 may_f1=0.9987 may_TP=69491 may_FP=186 may_FN=0 may=69491
+  retries=0
+  input_tokens=20167 output_tokens=105
+  elapsed_seconds=23.55
+
+ID: simple_3 | type: where | query: Show messages from host localhost
+  output_format_note=ignored output_format for query_type=where
+  command: awk '# The standard syslog date uses 3 fields (Month, Day, Time).
+# This makes the hostname the 4th field.
+$4 == "localhost"' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=96724 FP=0 FN=0 returned=96724 must=96724
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=96724 may_FP=0 may_FN=0 may=96724
+  retries=0
+  input_tokens=20166 output_tokens=72
+  elapsed_seconds=16.07
+
+ID: complex_1 | type: where | query: Find DHCPREQUEST messages on interface eth0 from host localhost with port 67
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Ensure the host field (4th column) is exactly "localhost"
+$4 == "localhost" {
+    # Match DHCPREQUEST messages explicitly on interface eth0 and port 67
+    # Uses ([^0-9]|$) to ensure we do not match port 670 or similar
+    if ($0 ~ /DHCPREQUEST +on +eth0 +to +[^ ]+ +port +67([^0-9]|$)/) {
+        print $0
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=11698 FP=0 FN=0 returned=11698 must=11698
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=11698 may_FP=0 may_FN=0 may=11698
+  retries=0
+  input_tokens=20177 output_tokens=150
+  elapsed_seconds=65.44
+
+ID: complex_2 | type: where | query: Show DHCPOFFER or DHCPACK messages from server 192.168.1.1
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines with DHCPOFFER or DHCPACK specifically from 192.168.1.1
+# The ([^0-9]|$) condition ensures we do not match longer IPs like 192.168.1.10
+/(DHCPOFFER|DHCPACK) from 192\.168\.1\.1([^0-9]|$)/ {
+    print $0
+}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5490 FP=0 FN=0 returned=5490 must=5490
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5490 may_FP=0 may_FN=0 may=5490
+  retries=0
+  input_tokens=20184 output_tokens=137
+  elapsed_seconds=33.49
+
+ID: complex_3 | type: where | query: Find all DHCP messages with transaction ID starting with 0x7
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/xid=0x7/' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6883 FP=0 FN=0 returned=6883 must=6883
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=6883 may_FP=0 may_FN=0 may=6883
+  retries=0
+  input_tokens=20174 output_tokens=34
+  elapsed_seconds=11.58
+
+ID: vague_1 | type: where | query: Show me DHCP errors
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+BEGIN {
+    # Combine keywords and phrases for various DHCP errors seen in the logs
+    e = "fail|error|no such device|unreachable|no dhcpoffers|no working leases"
+    e = e "|network is down|unknown hardware|no buffer space|suspect value"
+    e = e "|dhcpnak|can.t create|read-only file|permission denied|cannot assign"
+    e = e "|bad format|bad ip checksum|discarding packet|invalid domain"
+    e = e "|corrupt lease|address already in use|expect(ed|ing)|operation not permitted"
+    e = e "|no such file|malformed|out of range|cannot parse|unknown command"
+    e = e "|can.t get interface|cannot allocate memory|no broadcast interfaces"
+    e = e "|exceeds max|unterminated lease|no option named|already running"
+    e = e "|does not exist|notonlink|bogus|dhcpdecline|sent -1|extra bytes at end"
+}
+tolower($0) ~ e { print }
+' data/logs/dhcp
+  precision=0.7311 recall=0.6381 f1=0.6814 TP=14289 FP=5255 FN=8105 returned=19544 must=22394
+  may_precision=0.9991 may_recall=0.6722 may_f1=0.8037 may_TP=19526 may_FP=18 may_FN=9520 may=29046
+  retries=0
+  input_tokens=20165 output_tokens=295
+  elapsed_seconds=55.45
+
+ID: vague_2 | type: where | query: Find network problems
+  output_format_note=ignored output_format for query_type=where
+  command: awk 'BEGIN { IGNORECASE = 1 } /network is (unreachable|down)|no such device|no buffer space|cannot assign requested address|address already in use|bad ip checksums|unknown hardware address|no broadcast interfaces|no link-local ipv6|operation not permitted|bogus hlen|notonlink|failed to send.*packet|no dhcpoffers|regarding broadcast address/' data/logs/dhcp
+  precision=0.8385 recall=0.9988 f1=0.9116 TP=20024 FP=3857 FN=25 returned=23881 must=20049
+  may_precision=0.9735 may_recall=0.9961 may_f1=0.9847 may_TP=23249 may_FP=632 may_FN=91 may=23340
+  retries=0
+  input_tokens=20164 output_tokens=113
+  elapsed_seconds=28.49
+
+ID: numerical_1 | type: where | query: Find entries with process ID greater than 5000
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Extract and check process ID from brackets (e.g., dhclient[PID]) or parentheses (e.g., dhclient(PID))
+{
+    if (match($0, /dhclient\[[0-9]+\]/)) {
+        pid = substr($0, RSTART + 9, RLENGTH - 10) + 0
+        if (pid > 5000) {
+            print $0
+            next
+        }
+    }
+    if (match($0, /dhclient\([0-9]+\)/)) {
+        pid = substr($0, RSTART + 9, RLENGTH - 10) + 0
+        if (pid > 5000) {
+            print $0
+            next
+        }
+    }
+}' data/logs/dhcp
+  precision=0.9986 recall=1.0000 f1=0.9993 TP=104648 FP=144 FN=0 returned=104792 must=104648
+  may_precision=0.9986 may_recall=1.0000 may_f1=0.9993 may_TP=104648 may_FP=144 may_FN=0 may=104648
+  retries=0
+  input_tokens=20173 output_tokens=222
+  elapsed_seconds=29.21
+
+ID: numerical_2 | type: where | query: Show logs with retry interval less than 5
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Loop through all fields to find the keyword "interval"
+{
+    for (i = 1; i < NF; i++) {
+        # Check if current field is "interval" and the next field starts with a digit
+        if ($i == "interval" && $(i+1) ~ /^[0-9]+/) {
+            # Convert the next field to a number and check if it is less than 5
+            if (($(i+1) + 0) < 5) {
+                print $0
+            }
+            break
+        }
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5431 FP=0 FN=0 returned=5431 must=5431
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5431 may_FP=0 may_FN=0 may=5431
+  retries=0
+  input_tokens=20170 output_tokens=171
+  elapsed_seconds=37.89
+
+ID: time_1 | type: where | query: Show logs from June 18
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/^Jun 18 /' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1495 FP=0 FN=0 returned=1495 must=1495
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1495 may_FP=0 may_FN=0 may=1495
+  retries=0
+  input_tokens=20168 output_tokens=34
+  elapsed_seconds=10.95
+
+ID: time_2 | type: where | query: Find messages from September
+  output_format_note=ignored output_format for query_type=where
+  command: awk '$1 == "Sep"' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=57756 FP=0 FN=0 returned=57756 must=57756
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=57756 may_FP=0 may_FN=0 may=57756
+  retries=0
+  input_tokens=20165 output_tokens=33
+  elapsed_seconds=12.95
+
+ID: select_1 | type: select | query: List all hosts that sent DHCPDISCOVER messages
+  command: awk '/DHCPDISCOVER/ && !seen[$4]++ { print $4 }' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=647 FP=0 FN=0 returned=647 must=647
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=647 may_FP=0 may_FN=0 may=647
+  retries=0
+  input_tokens=20170 output_tokens=55
+  elapsed_seconds=23.53
+
+ID: select_2 | type: select | query: Find the original log timestamps from lines reporting a network is down error, using the timestamp text at the beginning of each matching log line.
+  requested output format=log_timestamp
+  requested output data type=string
+  command: awk '/Network is down/ {print $1, $2, $3}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1212 FP=0 FN=0 returned=1212 must=1212
+  may_precision=1.0000 may_recall=0.1306 may_f1=0.2311 may_TP=1212 may_FP=0 may_FN=8067 may=9279
+  retries=0
+  input_tokens=20386 output_tokens=42
+  elapsed_seconds=20.45
+
+ID: select_3 | type: select | query: For each DHCP log line where both are available, return the interface and message type
+  requested output format=interface_name,message_type
+  requested output data type=string,string
+  command: awk '/DHCP[A-Z]+ on |XMT: [A-Za-z-]+ on |RCV: [A-Za-z-]+ message on / { if (match($0, /DHCP[A-Z]+ on [^ ]+/)) { split(substr($0, RSTART, RLENGTH), a, " "); print a[3], a[1] } else if (match($0, /XMT: [A-Za-z-]+ on [^, ]+/)) { split(substr($0, RSTART, RLENGTH), a, " "); print a[4], a[2] } else if (match($0, /RCV: [A-Za-z-]+ message on [^ ]+/)) { split(substr($0, RSTART, RLENGTH), a, " "); print a[5], a[2] } }' data/logs/dhcp
+  precision=0.9751 recall=0.9899 f1=0.9824 TP=391 FP=10 FN=4 returned=401 must=395
+  may_precision=0.9751 may_recall=0.9899 may_f1=0.9824 may_TP=391 may_FP=10 may_FN=4 may=395
+  retries=0
+  input_tokens=20359 output_tokens=228
+  elapsed_seconds=57.94
+
+# Macro Averages (where/select queries)
+# precision=0.9856 recall=0.9737 f1=0.9781
+# may_precision=0.9982 may_recall=0.9475 may_f1=0.9602
+# retries_total=2 retries_avg=0.06
+# total_input_tokens=687302 total_output_tokens=4530
+# total_elapsed=1340.26s avg_elapsed=41.88s
+# Worst 5 queries by f1
+# 1. vague_1 | type: where | f1=0.6814 | query: Show me DHCP errors
+# 2. dhcp_select_4 | type: select | f1=0.8000 | query: Find the unique DHCP destination IPs used with non-standard ports
+# 3. vague_2 | type: where | f1=0.9116 | query: Find network problems
+# 4. dhcp_query_6 | type: where | f1=0.9412 | query: List all log lines reporting DHCP destination IPs running on non standard ports
+# 5. select_3 | type: select | f1=0.9824 | query: For each DHCP log line where both are available, return the interface and message type

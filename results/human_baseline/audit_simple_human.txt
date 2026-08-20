@@ -1,0 +1,55 @@
+# Human baseline report for audit_simple
+# Baseline scripts: human_baselines/audit_simple
+# Log file: data/logs/audit
+# Queries evaluated: 12
+
+ID: audit_query_1 | type: where | query: Find audit log lines that report SELinux AVC denials.
+  script: human_baselines/audit_simple/audit_query_1.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=16917 FP=0 FN=0 returned=16917 must=16917
+
+ID: audit_query_2 | type: where | query: Find audit log lines that show SELinux policy loads.
+  script: human_baselines/audit_simple/audit_query_2.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=7439 FP=0 FN=0 returned=7439 must=7439
+
+ID: audit_query_3 | type: where | query: Find audit log lines that show SELinux boolean changes.
+  script: human_baselines/audit_simple/audit_query_3.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=70 FP=0 FN=0 returned=70 must=70
+
+ID: audit_query_4 | type: where | query: Find audit log lines that show SELinux enforcing mode changes.
+  script: human_baselines/audit_simple/audit_query_4.sh
+  precision=0.9994 recall=1.0000 f1=0.9997 TP=7029 FP=4 FN=0 returned=7033 must=7029
+
+ID: audit_query_5 | type: where | query: Find audit log lines showing kernel audit initialization events.
+  script: human_baselines/audit_simple/audit_query_5.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=9535 FP=0 FN=0 returned=9535 must=9535
+
+ID: audit_query_6 | type: where | query: Find audit log lines that record the audit daemon process ID being set or changed.
+  script: human_baselines/audit_simple/audit_query_6.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=3554 FP=0 FN=0 returned=3554 must=3554
+
+ID: audit_query_7 | type: where | query: Find audit log lines for failed SSH authentication attempts handled by sshd.
+  script: human_baselines/audit_simple/audit_query_7.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1189 FP=0 FN=0 returned=1189 must=1189
+
+ID: audit_query_8 | type: where | query: Find audit log lines for PAM session open events.
+  script: human_baselines/audit_simple/audit_query_8.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2579 FP=0 FN=0 returned=2579 must=2579
+
+ID: audit_query_9 | type: where | query: Find audit log lines for systemd unit start events that name a service unit.
+  script: human_baselines/audit_simple/audit_query_9.sh
+  precision=1.0000 recall=0.9661 f1=0.9828 TP=2625 FP=0 FN=92 returned=2625 must=2717
+
+ID: audit_select_1 | type: select | query: Find the hosts that logged SELinux AVC denials.
+  script: human_baselines/audit_simple/audit_select_1.py
+  precision=0.8282 recall=1.0000 f1=0.9060 TP=347 FP=72 FN=0 returned=419 must=347
+
+ID: audit_select_2 | type: select | query: Find the SELinux boolean names that were changed.
+  script: human_baselines/audit_simple/audit_select_2.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=17 FP=0 FN=0 returned=17 must=17
+
+ID: audit_select_3 | type: select | query: Find the service unit names reported in systemd unit start events.
+  script: human_baselines/audit_simple/audit_select_3.py
+  precision=1.0000 recall=0.8009 f1=0.8895 TP=173 FP=0 FN=43 returned=173 must=216
+
+# Macro Averages
+# precision=0.9856 recall=0.9806 f1=0.9815

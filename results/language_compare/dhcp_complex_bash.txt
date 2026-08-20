@@ -1,0 +1,1421 @@
+# Evaluation report generated 20260429-141606
+# Source JSON: queries/dhcp_complex.json
+# Log file input: data/logs/dhcp
+# Log file resolved: data/logs/dhcp
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/dhcp_v2.json
+# Queries evaluated: 21
+
+ID: multiline_1 | type: select | query: Find transactions where time from DHCPREQUEST to DHCPACK exceeds 5 seconds. Return a list of pairs of transaction ids and duration.
+  requested output format=transaction_id,duration_seconds
+  requested output data type=string,float
+  command: awk '
+BEGIN {
+    m["Jan"]=1; m["Feb"]=2; m["Mar"]=3; m["Apr"]=4; m["May"]=5; m["Jun"]=6;
+    m["Jul"]=7; m["Aug"]=8; m["Sep"]=9; m["Oct"]=10; m["Nov"]=11; m["Dec"]=12;
+}
+/DHCPREQUEST|DHCPACK/ {
+    # Parse timestamp
+    split($3, t, ":");
+    ts = mktime("2000 " m[$1] " " $2 " " t[1] " " t[2] " " t[3]);
+    
+    host = $4;
+    prog = $5;
+    
+    # Extract PID
+    pid = "";
+    if (match(prog, /\[[0-9]+\]/)) {
+        pid = substr(prog, RSTART+1, RLENGTH-2);
+    }
+    
+    # Extract XID
+    xid = "";
+    idx = match($0, /xid=[^)]+/);
+    if (idx > 0) {
+        xid = substr($0, idx+4, RLENGTH-4);
+    }
+    
+    hx = host ":" xid;
+    hp = host ":" pid;
+    
+    # Track DHCPREQUEST
+    if ($0 ~ /DHCPREQUEST/) {
+        if (xid != "") {
+            if (!(hx in req_xid_ts)) req_xid_ts[hx] = ts;
+            pid_to_xid[hp] = xid;
+            delete req_pid_ts[hp];
+        } else {
+            if (!(hp in req_pid_ts)) req_pid_ts[hp] = ts;
+            delete pid_to_xid[hp];
+        }
+    }
+    
+    # Match DHCPACK
+    if ($0 ~ /DHCPACK/) {
+        if (xid != "") {
+            if (hx in req_xid_ts) {
+                dur = ts - req_xid_ts[hx];
+                if (dur > 5) print xid, dur;
+                delete req_xid_ts[hx];
+                if (pid_to_xid[hp] == xid) delete pid_to_xid[hp];
+            } else if (hp in req_pid_ts) {
+                dur = ts - req_pid_ts[hp];
+                if (dur > 5) print xid, dur;
+                delete req_pid_ts[hp];
+            }
+        } else {
+            res_xid = pid_to_xid[hp];
+            res_hx = host ":" res_xid;
+            if (res_xid != "" && (res_hx in req_xid_ts)) {
+                dur = ts - req_xid_ts[res_hx];
+                if (dur > 5) print res_xid, dur;
+                delete req_xid_ts[res_hx];
+                delete pid_to_xid[hp];
+            } else if (hp in req_pid_ts) {
+                delete req_pid_ts[hp];
+            }
+        }
+    }
+}' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=163 FN=163 returned=163 must=163
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=163 may_FN=608 may=608
+  retries=0
+  input_tokens=20369 output_tokens=849
+  elapsed_seconds=113.99
+
+ID: multiline_2 | type: select | query: Find hosts issuing >100 DHCPREQUESTs within any 30-minute rolling window. Report the times of the first and last REQUEST of the first such window with the largest number of requests for each host.
+  requested output format=host,request_count_in_30min_window,window_start,window_end
+  requested output data type=string,integer,float,float
+  command: awk '
+BEGIN {
+    # Map abbreviated month names to numbers
+    mmap["Jan"]=1; mmap["Feb"]=2; mmap["Mar"]=3; mmap["Apr"]=4;
+    mmap["May"]=5; mmap["Jun"]=6; mmap["Jul"]=7; mmap["Aug"]=8;
+    mmap["Sep"]=9; mmap["Oct"]=10; mmap["Nov"]=11; mmap["Dec"]=12;
+}
+
+/ DHCPREQUEST / {
+    # Extract month from standard syslog header
+    mon = mmap[$1]
+    if (!mon) next
+    
+    # Split the HH:MM:SS time string
+    split($3, t, ":")
+    
+    # Convert to Unix timestamp using mktime (assumes Year 2000 per instructions)
+    # mktime naturally interprets the inputs as local wall-clock time
+    ts = mktime(2000 " " mon " " $2 " " t[1] " " t[2] " " t[3])
+    if (ts == -1) next
+    
+    # Host is the 4th field
+    host = $4
+    count[host]++
+    times[host, count[host]] = ts
+}
+
+END {
+    for (host in count) {
+        n = count[host]
+        
+        # Filter out hosts that have 100 or fewer requests globally to save processing
+        if (n <= 100) continue
+        
+        # Copy timestamps for this host into a 1D array for sorting
+        split("", T)
+        for (i = 1; i <= n; i++) {
+            T[i] = times[host, i]
+        }
+        
+        # Sort timestamps chronologically
+        asort(T)
+        
+        max_c = 0
+        best_s = 0
+        best_e = 0
+        
+        # Sliding window algorithm to find the max events in any <=1800 second window
+        j = 1
+        for (i = 1; i <= n; i++) {
+            # Advance right pointer as long as window fits within 30 minutes (1800 seconds)
+            while (j <= n && T[j] - T[i] <= 1800) {
+                j++
+            }
+            
+            # Number of events in current window [T[i], T[j-1]]
+            c = j - i
+            
+            # Strict inequality ensures we only record the FIRST window if there is a tie
+            if (c > max_c) {
+                max_c = c
+                best_s = T[i]
+                best_e = T[j-1]
+            }
+        }
+        
+        # Final check if the best window has strictly more than 100 requests
+        if (max_c > 100) {
+            print host, max_c, best_s, best_e
+        }
+    }
+}
+' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=30 FN=30 returned=30 must=30
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=30 may_FN=30 may=30
+  retries=0
+  input_tokens=20481 output_tokens=792
+  elapsed_seconds=160.05
+
+ID: multiline_3 | type: select | query: Identify transaction_ids where a second DHCPREQUEST occurs before the DHCPACK for the first.
+  requested output format=transaction_id
+  requested output data type=string
+  command: awk '
+{
+    # Extract host and process_id to handle fallback mapping for lines without xid
+    host = $4
+    pid = ""
+    if (match($5, /\[[0-9]+\]/)) {
+        pid = substr($5, RSTART+1, RLENGTH-2)
+    }
+    fallback_key = host "\t" pid
+
+    # Extract explicit transaction_id if present
+    line_xid = ""
+    if (match($0, /xid=[a-zA-Z0-9]+/)) {
+        line_xid = substr($0, RSTART+4, RLENGTH-4)
+        current_xid[fallback_key] = line_xid
+    }
+
+    # Resolve xid for the current log line
+    xid = line_xid != "" ? line_xid : current_xid[fallback_key]
+
+    if ($0 ~ /: DHCPREQUEST/) {
+        if (xid == "") {
+            # If we do not know the xid yet, increment the pending count for this process
+            pending_req[fallback_key]++
+        } else {
+            key = host "\t" xid
+            if (!ack[key]) {
+                # Accumulate any pending requests that belonged to this transaction
+                req[key] += pending_req[fallback_key] + 1
+                pending_req[fallback_key] = 0
+                if (req[key] >= 2 && !printed[key]) {
+                    print xid
+                    printed[key] = 1
+                }
+            }
+        }
+    } else if ($0 ~ /: DHCPACK/) {
+        if (xid != "") {
+            key = host "\t" xid
+            if (!ack[key]) {
+                # If the transaction had 2+ pending requests but we only discover its xid on ACK
+                if (pending_req[fallback_key] >= 2 && !printed[key]) {
+                    print xid
+                    printed[key] = 1
+                }
+                ack[key] = 1
+            }
+        }
+        # Clear state after acknowledging
+        pending_req[fallback_key] = 0
+        current_xid[fallback_key] = ""
+    } else if ($0 ~ /: (DHCPDISCOVER|DHCPNAK|DHCPDECLINE|DHCPRELEASE)/) {
+        # Reset pending requests when a transaction terminates or a new one begins
+        pending_req[fallback_key] = 0
+        # Clear the cached xid unless this is a DISCOVER that provides a new explicit xid
+        if ($0 ~ /: (DHCPNAK|DHCPDECLINE|DHCPRELEASE)/ || line_xid == "") {
+            current_xid[fallback_key] = ""
+        }
+    }
+}' data/logs/dhcp
+  precision=0.9980 recall=0.8620 f1=0.9250 TP=506 FP=1 FN=81 returned=507 must=587
+  may_precision=0.9980 may_recall=0.8620 may_f1=0.9250 may_TP=506 may_FP=1 may_FN=81 may=587
+  retries=0
+  input_tokens=20349 output_tokens=722
+  elapsed_seconds=137.31
+
+ID: multiline_4 | type: select | query: For each client that sent at least one DHCPDISCOVER with an explicit transaction ID, count how many transaction IDs begin with DHCPDISCOVER, how many of those later contain DHCPACK, and the resulting completion rate.
+  requested output format=client,discover_started_transactions,completed_with_ack,completion_rate
+  requested output data type=string,integer,integer,float
+  command: awk '
+match($0, /xid=[^)]+/) {
+    xid = substr($0, RSTART+4, RLENGTH-4)
+    host = $4
+    is_disc = ($0 ~ /DHCPDISCOVER/)
+    is_ack  = ($0 ~ /DHCPACK/)
+    
+    if (is_disc) {
+        clients[host] = 1
+    }
+    
+    tx = host "|" xid
+    if (!(tx in first)) {
+        if (is_disc) {
+            first[tx] = 1
+            disc_count[host]++
+        } else {
+            first[tx] = 0
+        }
+    }
+    
+    if (first[tx] == 1 && is_ack) {
+        if (!acked[tx]) {
+            acked[tx] = 1
+            ack_count[host]++
+        }
+    }
+}
+END {
+    for (host in clients) {
+        d = disc_count[host] + 0
+        a = ack_count[host] + 0
+        rate = d > 0 ? a / d : 0
+        printf "%s %d %d %f\n", host, d, a, rate
+    }
+}' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=196 FN=196 returned=196 must=196
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=196 may_FN=196 may=196
+  retries=0
+  input_tokens=20414 output_tokens=336
+  elapsed_seconds=72.18
+
+ID: multiline_5 | type: select | query: Considering only client/process streams that contain DHCPDISCOVER, DHCPOFFER, DHCPREQUEST, and DHCPACK, return for each client the average elapsed seconds between the DISCOVER and ACK.
+  requested output format=client,avg_discover_to_ack_seconds
+  requested output data type=string,float
+  command: awk '
+# Initialize month mapping for mktime
+BEGIN {
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+
+# Filter for relevant log lines
+/DHCPDISCOVER on|DHCPOFFER from|DHCPREQUEST on|DHCPACK from/ {
+    # Parse timestamp (timeline starts in 2000)
+    split($3, t, ":");
+    ts = mktime("2000 " m[$1] " " $2 " " t[1] " " t[2] " " t[3]);
+    if (ts < 0) next;
+    
+    # Extract client and process ID
+    client = $4;
+    pid = "none";
+    if ($5 ~ /^dhclient/) {
+        if (match($5, /\[[0-9]+\]/)) {
+            pid = substr($5, RSTART+1, RLENGTH-2);
+        }
+    } else {
+        # Fallback to search for dhclient process ID
+        for (i=4; i<=NF; i++) {
+            if ($i ~ /^dhclient/) {
+                if (match($i, /\[[0-9]+\]/)) {
+                    pid = substr($i, RSTART+1, RLENGTH-2);
+                }
+                break;
+            }
+        }
+    }
+    
+    # Base fallback key using client and process ID
+    cp = client SUBSEP pid;
+    
+    # Extract transaction ID if present (preserve 0x prefix)
+    xid = "";
+    if (match($0, /xid=0x[0-9a-fA-F]+/)) {
+        xid = substr($0, RSTART+4, RLENGTH-4);
+    }
+    
+    # Stateful mapping of process ID to transaction ID
+    if (xid != "") {
+        tx = client SUBSEP xid;
+        pid_to_tx[cp] = tx;
+        tx_client[tx] = client;
+    } else {
+        if (cp in pid_to_tx) {
+            tx = pid_to_tx[cp];
+        } else {
+            tx = cp; 
+            tx_client[tx] = client;
+        }
+    }
+    
+    # Record events and timestamps
+    if ($0 ~ /DHCPDISCOVER on/) {
+        has_disc[tx] = 1;
+        if (!(tx in ts_disc)) ts_disc[tx] = ts;
+    }
+    if ($0 ~ /DHCPOFFER from/) {
+        has_offer[tx] = 1;
+    }
+    if ($0 ~ /DHCPREQUEST on/) {
+        has_req[tx] = 1;
+    }
+    if ($0 ~ /DHCPACK from/) {
+        has_ack[tx] = 1;
+        # Record ACK timestamp only if it happens after or on the same second as DISCOVER
+        if ((tx in ts_disc) && !(tx in ts_ack) && ts >= ts_disc[tx]) {
+            ts_ack[tx] = ts;
+        }
+    }
+}
+
+# Output results
+END {
+    for (tx in has_disc) {
+        # Check if stream contains all 4 required events
+        if (has_disc[tx] && has_offer[tx] && has_req[tx] && has_ack[tx]) {
+            c = tx_client[tx];
+            if ((tx in ts_disc) && (tx in ts_ack)) {
+                elapsed = ts_ack[tx] - ts_disc[tx];
+                sum[c] += elapsed;
+                count[c]++;
+            }
+        }
+    }
+    # Calculate and emit average elapsed time per client
+    for (c in sum) {
+        if (count[c] > 0) {
+            printf "%s %f\n", c, sum[c] / count[c];
+        }
+    }
+}
+' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=605 FN=585 returned=605 must=585
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=605 may_FN=585 may=585
+  retries=0
+  input_tokens=20390 output_tokens=1085
+  elapsed_seconds=154.36
+
+ID: multiline_6 | type: select | query: For each DHCP server IP address, count the total number of OFFER messages sent. Then count how many of those OFFER messages resulted in a corresponding ACK within 60 seconds for the same transaction. Compute the conversion rate.
+  requested output format=server_ip,offer_total,offer_with_ack_60s,conversion_rate
+  requested output data type=string,integer,integer,float
+  command: awk 'BEGIN { m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06"; m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12"; } /DHCPOFFER from |DHCPACK from / { month=$1; day=$2; if (!(month in m)) next; split($3, t, ":"); ts=mktime("2000 " m[month] " " day " " t[1] " " t[2] " " t[3]); host=$4; proc=$5; sub(/:$/, "", proc); ip=""; type=""; for(i=5; i<=NF; i++) { if($i=="DHCPOFFER" && $(i+1)=="from") { ip=$(i+2); type="OFFER"; break; } if($i=="DHCPACK" && $(i+1)=="from") { ip=$(i+2); type="ACK"; break; } } sub(/<.*/, "", ip); if(ip!="" && ip!~/^[(]/) { all_ips[ip]=1; key=host "|" proc "|" ip; if(type=="OFFER") { offer_totals[ip]++; offers[key, ++offer_count[key]]=ts; } else if(type=="ACK") { for(i=1; i<=offer_count[key]; i++) { if(offers[key, i]!="" && ts>=offers[key, i] && (ts-offers[key, i])<=60) { offer_with_ack[ip]++; offers[key, i]=""; break; } } } } } END { for(ip in all_ips) { tot=offer_totals[ip]+0; acks=offer_with_ack[ip]+0; rate=(tot>0)?(acks/tot):0; printf "%s %d %d %.6f\n", ip, tot, acks, rate; } }' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=814 FN=541 returned=814 must=541
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=814 may_FN=541 may=541
+  retries=0
+  input_tokens=20423 output_tokens=544
+  elapsed_seconds=115.59
+
+ID: multiline_7 | type: select | query: For each client, count transaction IDs that contain a DISCOVER and do not contain an ACK within 120 seconds. Only use transactions with an explicit transaction ID, return only clients with a nonzero count, and sort the results in descending order.
+  requested output format=client,discover_without_ack_120s_count
+  requested output data type=string,integer
+  command: awk '
+BEGIN {
+    # Map short month names to numerical strings
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+{
+    # Only process lines with an explicit transaction ID (xid)
+    if (match($0, /xid=[a-zA-Z0-9]+/)) {
+        xid = substr($0, RSTART+4, RLENGTH-4)
+        client = $4
+        
+        # Parse timestamp: extract month, clean leading priority tags if present
+        mon = $1
+        sub(/^<[0-9]+>/, "", mon)
+        month_num = m[mon]
+        if (!month_num) next
+        
+        # Convert log time into a mktime compatible format using a fixed year 2000
+        time_str = $3
+        gsub(/:/, " ", time_str)
+        ts = mktime("2000 " month_num " " $2 " " time_str)
+        
+        # Store all DISCOVER times for the specific client and transaction ID
+        if (/DHCPDISCOVER/) {
+            discs[client, xid] = discs[client, xid] (discs[client, xid] ? "," : "") ts
+        }
+        # Store all ACK times for the specific client and transaction ID
+        if (/DHCPACK/) {
+            acks[client, xid] = acks[client, xid] (acks[client, xid] ? "," : "") ts
+        }
+    }
+}
+END {
+    # Evaluate each transaction that contained a DISCOVER
+    for (cx in discs) {
+        split(cx, parts, SUBSEP)
+        client = parts[1]
+        
+        has_ack_within_120 = 0
+        
+        if (cx in acks) {
+            split(discs[cx], disc_arr, ",")
+            split(acks[cx], ack_arr, ",")
+            
+            # Check if any ACK occurs between 0 and 120 seconds after any DISCOVER
+            for (d in disc_arr) {
+                for (a in ack_arr) {
+                    diff = ack_arr[a] - disc_arr[d]
+                    if (diff >= 0 && diff <= 120) {
+                        has_ack_within_120 = 1
+                        break
+                    }
+                }
+                if (has_ack_within_120) break
+            }
+        }
+        
+        # Increment missing ACK count if no valid ACK matched the condition
+        if (!has_ack_within_120) {
+            counts[client]++
+        }
+    }
+    
+    # Output only clients with nonzero counts
+    for (client in counts) {
+        if (counts[client] > 0) {
+            print client, counts[client]
+        }
+    }
+}
+' data/logs/dhcp | sort -k2,2nr
+  precision=1.0000 recall=0.9762 f1=0.9880 TP=41 FP=0 FN=1 returned=41 must=42
+  may_precision=1.0000 may_recall=0.9762 may_f1=0.9880 may_TP=41 may_FP=0 may_FN=1 may=42
+  retries=0
+  input_tokens=20407 output_tokens=847
+  elapsed_seconds=116.99
+
+ID: multiline_8 | type: select | query: For each client and network interface, count the total number of DISCOVER and REQUEST messages observed. Output one row per client and interface.
+  requested output format=client,interface,discover_count,request_count
+  requested output data type=string,string,integer,integer
+  command: awk '
+/DHCPDISCOVER|DHCPREQUEST/ {
+    # Extract host from the 4th field
+    host = $4;
+    
+    # Process DHCPDISCOVER messages
+    str = $0;
+    while (match(str, /DHCPDISCOVER on [^ ]+/)) {
+        iface = substr(str, RSTART + 16, RLENGTH - 16);
+        disc[host, iface]++;
+        seen[host, iface] = 1;
+        str = substr(str, RSTART + RLENGTH);
+    }
+    
+    # Process DHCPREQUEST messages
+    str = $0;
+    while (match(str, /DHCPREQUEST on [^ ]+/)) {
+        iface = substr(str, RSTART + 15, RLENGTH - 15);
+        req[host, iface]++;
+        seen[host, iface] = 1;
+        str = substr(str, RSTART + RLENGTH);
+    }
+}
+END {
+    # Print output: client, interface, discover_count, request_count
+    for (key in seen) {
+        split(key, k, SUBSEP);
+        print k[1], k[2], disc[key]+0, req[key]+0;
+    }
+}' data/logs/dhcp
+  precision=0.9863 recall=0.9863 f1=0.9863 TP=1512 FP=21 FN=21 returned=1533 must=1533
+  may_precision=0.9863 may_recall=0.9863 may_f1=0.9863 may_TP=1512 may_FP=21 may_FN=21 may=1533
+  retries=0
+  input_tokens=20386 output_tokens=331
+  elapsed_seconds=52.4
+
+ID: multiline_9 | type: select | query: For each client, calculate the average number of DHCP messages logged per transaction ID. Only count DHCP messages that specify a transaction ID. 
+  requested output format=client,avg_messages_per_transaction
+  requested output data type=string,float
+  command: awk '
+# Match lines containing a transaction ID
+/xid=/ {
+    # The 4th field is the client host
+    client = $4
+    
+    # Find the start of the transaction ID
+    idx = index($0, "xid=")
+    if (idx > 0) {
+        # Extract the substring starting after "xid="
+        rest = substr($0, idx + 4)
+        
+        # The transaction ID ends at the closing parenthesis
+        end = index(rest, ")")
+        if (end > 0) {
+            xid = substr(rest, 1, end - 1)
+            
+            # Increment the total messages for this client
+            total_msgs[client]++
+            
+            # Increment unique transaction ID count for this client
+            if (!seen[client, xid]++) {
+                unique_xids[client]++
+            }
+        }
+    }
+}
+END {
+    # Calculate and print the average messages per transaction ID for each client
+    for (client in total_msgs) {
+        avg = total_msgs[client] / unique_xids[client]
+        print client, avg
+    }
+}' data/logs/dhcp
+  precision=0.1930 recall=0.1930 f1=0.1930 TP=66 FP=276 FN=276 returned=342 must=342
+  may_precision=0.1930 may_recall=0.1930 may_f1=0.1930 may_TP=66 may_FP=276 may_FN=276 may=342
+  retries=0
+  input_tokens=20374 output_tokens=324
+  elapsed_seconds=50.7
+
+ID: multiline_10 | type: select | query: For each hour 0 through 23, count unique transaction IDs whose DISCOVER occurred in that hour. Then count how many of those same transaction IDs have an ACK anywhere in the log. Use only explicit transaction IDs and return all 24 hours with the completion rate for each hour.
+  requested output format=hour_of_day,discover_transaction_count,completed_with_ack_count,completion_rate
+  requested output data type=integer,integer,integer,float
+  command: awk '
+{
+    # Extract transaction ID if present
+    if (match($0, /xid=(0x[0-9a-fA-F]+)/)) {
+        xid = substr($0, RSTART + 4, RLENGTH - 4)
+        
+        # Identify the host or client to form a unique key
+        host = "unknown"
+        for (i = 2; i <= 10; i++) {
+            if ($i ~ /^dhclient(\[[0-9]+\])?:?$/) {
+                host = $(i-1)
+                break
+            }
+        }
+        
+        # Unique identifier combining host and xid
+        cx = host "_" xid
+
+        # If it is a DISCOVER, record the hour
+        if ($0 ~ /DHCPDISCOVER/) {
+            if (match($0, /[0-2][0-9]:[0-5][0-9]:[0-5][0-9]/)) {
+                h = substr($0, RSTART, 2) + 0
+                disc_hr_xid[h, cx] = 1
+            }
+        }
+        
+        # If it is an ACK anywhere in the log, mark the transaction as acked
+        if ($0 ~ /DHCPACK/) {
+            ack[cx] = 1
+        }
+    }
+}
+END {
+    # Initialize counts for all 24 hours
+    for (h = 0; h < 24; h++) {
+        d[h] = 0
+        a[h] = 0
+    }
+    
+    # Process the unique DISCOVER transactions per hour
+    for (hcx in disc_hr_xid) {
+        split(hcx, arr, SUBSEP)
+        h = arr[1] + 0
+        cx = arr[2]
+        
+        d[h]++
+        # Check if this same transaction received an ACK anywhere
+        if (ack[cx]) {
+            a[h]++
+        }
+    }
+    
+    # Print results in required order: hour, discover_count, ack_count, rate
+    for (h = 0; h < 24; h++) {
+        r = d[h] > 0 ? a[h] / d[h] : 0.0
+        printf "%d %d %d %f\n", h, d[h], a[h], r
+    }
+}
+' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=24 FN=24 returned=24 must=24
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=24 may_FN=24 may=24
+  retries=0
+  input_tokens=20442 output_tokens=638
+  elapsed_seconds=99.55
+
+ID: multiline_11 | type: select | query: Return the 1-indexed line number and hostname for each DHCPOFFER line where no DHCPDISCOVER from the same hostname/process stream occurred in the previous 30 seconds. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream.
+  requested output format=line_id,client
+  requested output data type=integer,string
+  command: awk '
+BEGIN {
+    # Initialize month mapping for mktime
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04";
+    m["May"]="05"; m["Jun"]="06"; m["Jul"]="07"; m["Aug"]="08";
+    m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+{
+    # Parse month; skip line if it does not start with a valid syslog month
+    mon = m[$1];
+    if (!mon) next;
+    
+    # Parse the timestamp using the static year 2000 as per constraints
+    d = $2;
+    split($3, t, ":");
+    ts = mktime("2000 " mon " " d " " t[1] " " t[2] " " t[3]);
+    
+    # Extract hostname from standard syslog position
+    host = $4;
+    
+    # Extract PID if present in dhclient[...] 
+    pid = "";
+    if (match($0, /dhclient\[[0-9]+\]/)) {
+        pid = substr($0, RSTART+9, RLENGTH-10);
+    }
+    
+    # Extract transaction ID (xid) if present; otherwise infer from last seen for this host/pid
+    xid = "";
+    if (match($0, /xid=0x[0-9a-fA-F]+/)) {
+        xid = substr($0, RSTART+4, RLENGTH-4);
+        last_xid[host, pid] = xid;
+    } else {
+        xid = last_xid[host, pid];
+    }
+    
+    # Define stream key based on xid or fallback to pid
+    key = host ":" xid;
+    if (xid == "") {
+        key = host ":" pid;
+    }
+    
+    # Track the timestamp of the latest DHCPDISCOVER for this stream
+    if ($0 ~ / DHCPDISCOVER /) {
+        last_disc[key] = ts;
+    }
+    
+    # For each DHCPOFFER, check if a DHCPDISCOVER from the same stream occurred in the last 30s
+    if ($0 ~ / DHCPOFFER /) {
+        diff = ts - last_disc[key];
+        # Print if no DHCPDISCOVER was seen, or if it occurred more than 30s ago
+        # (diff < 0 handles theoretical out-of-order/future timestamps)
+        if (!(key in last_disc) || diff > 30 || diff < 0) {
+            print NR, host;
+        }
+    }
+}
+' data/logs/dhcp
+  precision=0.9412 recall=0.6957 f1=0.8000 TP=16 FP=1 FN=7 returned=17 must=23
+  may_precision=0.9412 may_recall=0.6957 may_f1=0.8000 may_TP=16 may_FP=1 may_FN=7 may=23
+  retries=0
+  input_tokens=20399 output_tokens=725
+  elapsed_seconds=158.35
+
+ID: multiline_12 | type: select | query: Identify ACK messages where no matching REQUEST from the same transaction occurred within the previous 30 seconds.
+  requested output format=line_id,transaction_id
+  requested output data type=integer,string
+  command: awk '
+BEGIN {
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+{
+    if ($1 in m) {
+        split($3, t, ":");
+        ts = mktime("2000 " m[$1] " " $2 " " t[1] " " t[2] " " t[3]);
+    } else {
+        ts = 0;
+    }
+    
+    host = $4;
+    
+    pid = "";
+    if (match($5, /\[[0-9]+\]/)) {
+        pid = substr($5, RSTART+1, RLENGTH-2);
+    }
+    
+    client = host "_" pid;
+    
+    xid = "";
+    if (match($0, /xid=0x[0-9a-fA-F]+/)) {
+        xid = substr($0, RSTART+4, RLENGTH-4);
+        last_xid[client] = xid;
+    } else {
+        if (client in last_xid) {
+            xid = last_xid[client];
+        }
+    }
+    
+    if (xid != "") {
+        if ($0 ~ /DHCPREQUEST/) {
+            req_ts[host, xid] = ts;
+        }
+        if ($0 ~ /DHCPACK/) {
+            has_recent = 0;
+            if ((host, xid) in req_ts) {
+                diff = ts - req_ts[host, xid];
+                if (diff >= 0 && diff <= 30) {
+                    has_recent = 1;
+                }
+            }
+            if (!has_recent) {
+                print NR, xid;
+            }
+        }
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=0 FP=0 FN=0 returned=0 must=0
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=0 may_FP=0 may_FN=0 may=0
+  retries=0
+  input_tokens=20363 output_tokens=567
+  elapsed_seconds=91.08
+
+ID: multiline_13 | type: select | query: Identify invalid DHCP cycle transitions by hostname and transaction ID. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream. Valid repeated cycles are DHCPDISCOVER -> DHCPOFFER -> DHCPREQUEST -> DHCPACK and DHCPREQUEST -> DHCPACK. Treat incomplete trailing sequences as allowed; only explicit bad transitions are violations.
+  requested output format=client,transaction_id
+  requested output data type=string,string
+  command: awk '
+# Split line by syslog priority tags to handle multiple messages per line
+{
+    n = split($0, parts, /<[0-9]+>/);
+    host = "";
+    pid = "";
+    for (i = 1; i <= n; i++) {
+        p = parts[i];
+        if (p ~ /^[ \t]*$/) continue;
+        
+        # Tokenize the part by whitespace
+        split(p, tk);
+        
+        # Check if the part starts with a standard syslog timestamp
+        if (tk[1] ~ /^[A-Z][a-z]{2}$/ && tk[2] ~ /^[0-9]+$/ && tk[3] ~ /^[0-9:]+$/) {
+            # If the 4th token is the dhclient program, host is omitted (carried over)
+            if (tk[4] ~ /^dhclient(\[[0-9]+\])?[:]/) {
+                prog = tk[4];
+            } else {
+                host = tk[4];
+                prog = tk[5];
+            }
+            # Extract PID if present
+            if (match(prog, /\[[0-9]+\]/)) {
+                pid = substr(prog, RSTART+1, RLENGTH-2);
+            } else {
+                pid = "";
+            }
+        }
+        
+        # Extract the DHCP state
+        state = "";
+        if (match(p, /DHCP(DISCOVER|OFFER|REQUEST|ACK)/)) {
+            state = substr(p, RSTART, RLENGTH);
+        }
+        
+        # Extract the transaction ID
+        xid = "";
+        if (match(p, /xid=0x[0-9a-fA-F]+/)) {
+            xid = substr(p, RSTART+4, RLENGTH-4);
+        }
+        
+        # If we have a state and a host, process the transition
+        if (state != "" && host != "") {
+            stream = host "|" pid;
+            # Infer missing transaction ID from the process stream
+            if (xid != "") {
+                last_xid[stream] = xid;
+            } else {
+                xid = last_xid[stream];
+            }
+            
+            # If we successfully resolved an XID, check the cycle transitions
+            if (xid != "") {
+                key = host "|" xid;
+                prev = last_state[key];
+                
+                # Check for bad transitions (ignoring repeated states)
+                if (prev != "" && prev != state) {
+                    bad = 0;
+                    if (prev == "DHCPDISCOVER" && state != "DHCPOFFER") bad = 1;
+                    else if (prev == "DHCPOFFER" && state != "DHCPREQUEST") bad = 1;
+                    else if (prev == "DHCPREQUEST" && state != "DHCPACK") bad = 1;
+                    else if (prev == "DHCPACK" && state != "DHCPDISCOVER" && state != "DHCPREQUEST") bad = 1;
+                    
+                    # Output violations uniquely by host and xid
+                    if (bad && !seen[key]) {
+                        print host, xid;
+                        seen[key] = 1;
+                    }
+                }
+                # Update state for this transaction
+                last_state[key] = state;
+            }
+        }
+    }
+}' data/logs/dhcp
+  precision=0.9978 recall=0.3158 f1=0.4797 TP=1847 FP=4 FN=4002 returned=1851 must=5849
+  may_precision=0.9978 may_recall=0.3158 may_f1=0.4797 may_TP=1847 may_FP=4 may_FN=4002 may=5849
+  retries=0
+  input_tokens=20411 output_tokens=862
+  elapsed_seconds=185.79
+
+ID: multiline_14 | type: select | query: Identify transactions where two or more REQUEST messages occur before the first ACK.
+  requested output format=transaction_id
+  requested output data type=string
+  command: awk '
+{
+    # Extract host
+    host = $4
+    
+    # Extract PID if present
+    pid = ""
+    if ($5 ~ /^dhclient\[[0-9]+\]:/) {
+        pid_str = $5
+        sub(/^dhclient\[/, "", pid_str)
+        sub(/\]:.*/, "", pid_str)
+        pid = pid_str
+    }
+    
+    # Extract xid (transaction_id)
+    xid = ""
+    if (match($0, /xid=[^)]+/)) {
+        xid = substr($0, RSTART+4, RLENGTH-4)
+    }
+    
+    # Fallback to previously seen xid for this host and pid
+    key = host ":" pid
+    if (xid != "") {
+        current_xid[key] = xid
+    } else {
+        if (key in current_xid) {
+            xid = current_xid[key]
+        }
+    }
+    
+    # Skip if we cannot determine transaction_id
+    if (xid == "") next
+    
+    tx_key = host ":" xid
+    
+    is_discover = ($0 ~ /[ \t]DHCPDISCOVER[ \t]/)
+    is_request = ($0 ~ /[ \t]DHCPREQUEST[ \t]/)
+    is_ack = ($0 ~ /[ \t]DHCPACK[ \t]/)
+    
+    # Reset tracking state if transaction restarts
+    if (is_discover) {
+        req_count[tx_key] = 0
+        ack_seen[tx_key] = 0
+    }
+    
+    if (is_request) {
+        if (!ack_seen[tx_key]) {
+            req_count[tx_key]++
+            # Emit exactly when we see the 2nd REQUEST before any ACK
+            if (req_count[tx_key] == 2) {
+                if (!emitted[xid]) {
+                    print xid
+                    emitted[xid] = 1
+                }
+            }
+        }
+    }
+    
+    if (is_ack) {
+        ack_seen[tx_key] = 1
+    }
+}' data/logs/dhcp
+  precision=0.9921 recall=1.0000 f1=0.9961 TP=505 FP=4 FN=0 returned=509 must=505
+  may_precision=0.9921 may_recall=1.0000 may_f1=0.9961 may_TP=505 may_FP=4 may_FN=0 may=505
+  retries=0
+  input_tokens=20345 output_tokens=590
+  elapsed_seconds=96.23
+
+ID: multiline_15 | type: select | query: For completed transactions, calculate the time difference in seconds between the REQUEST and the ACK. List transactions where this latency exceeds 5 seconds.
+  requested output format=transaction_id,request_to_ack_latency_seconds
+  requested output data type=string,float
+  command: awk '
+BEGIN {
+    # Map for months
+    m["Jan"]=1; m["Feb"]=2; m["Mar"]=3; m["Apr"]=4; m["May"]=5; m["Jun"]=6;
+    m["Jul"]=7; m["Aug"]=8; m["Sep"]=9; m["Oct"]=10; m["Nov"]=11; m["Dec"]=12;
+}
+{
+    # Ensure log line starts with a valid month
+    if (!($1 in m)) next;
+    
+    # Parse timestamp assuming year 2000
+    split($3, t, ":");
+    ts = mktime("2000 " m[$1] " " $2 " " t[1] " " t[2] " " t[3]);
+    
+    # Identify host and process
+    host = $4;
+    proc = $5;
+    sub(/:$/, "", proc);
+    
+    # Extract transaction ID from log line or fallback to current state
+    xid = "";
+    if (match($0, /\(xid=[^)]+\)/)) {
+        xid = substr($0, RSTART+5, RLENGTH-6);
+        cx[host SUBSEP proc] = xid;
+    } else if ((host SUBSEP proc) in cx) {
+        xid = cx[host SUBSEP proc];
+    }
+    
+    # Skip if we cannot determine transaction ID
+    if (xid == "") next;
+    
+    key = host SUBSEP xid;
+    
+    # Track the first request time for a transaction
+    if ($0 ~ /DHCPREQUEST/) {
+        if (!(key in req)) req[key] = ts;
+    }
+    
+    # Calculate latency on acknowledgment
+    if ($0 ~ /DHCPACK/) {
+        if (key in req) {
+            lat = ts - req[key];
+            if (lat > 5) print xid, lat;
+            delete req[key];
+        }
+    }
+}' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=169 FN=163 returned=169 must=163
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=169 may_FN=163 may=163
+  retries=0
+  input_tokens=20382 output_tokens=548
+  elapsed_seconds=79.57
+
+ID: multiline_16 | type: select | query: Identify transactions (same client and transaction ID) where two or more DISCOVER messages occur within 60 seconds and no OFFER is present.
+  requested output format=client,transaction_id
+  requested output data type=string,string
+  command: awk '
+BEGIN {
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+{
+    mon = $1;
+    sub(/^<[0-9]+>/, "", mon);
+    if (!(mon in m)) next;
+
+    if ($5 !~ /^dhclient/) next;
+
+    time_str = $3;
+    gsub(/:/, " ", time_str);
+    ts = mktime("2000 " m[mon] " " $2 " " time_str);
+
+    client = $4;
+    
+    pid = "";
+    if (match($5, /\[[0-9]+\]/)) {
+        pid = substr($5, RSTART+1, RLENGTH-2);
+    }
+    
+    if (match($0, /\(xid=[^)]+\)/)) {
+        xid = substr($0, RSTART+5, RLENGTH-6);
+        active_xid[client, pid] = xid;
+    } else if ($0 ~ /DHCPDISCOVER/) {
+        active_xid[client, pid] = "";
+        xid = "";
+    } else {
+        xid = active_xid[client, pid];
+    }
+    
+    if (xid == "") next;
+    
+    if ($0 ~ /DHCPDISCOVER/) {
+        idx = ++discover_count[client, xid];
+        discover_times[client, xid, idx] = ts;
+    }
+    
+    if ($0 ~ /DHCPOFFER from/) {
+        has_offer[client, xid] = 1;
+    }
+}
+END {
+    for (cx in discover_count) {
+        split(cx, arr, SUBSEP);
+        client = arr[1];
+        xid = arr[2];
+        
+        if (has_offer[client, xid]) continue;
+        
+        cnt = discover_count[client, xid];
+        if (cnt >= 2) {
+            found = 0;
+            for (i=1; i<cnt; i++) {
+                diff = discover_times[client, xid, i+1] - discover_times[client, xid, i];
+                if (diff < 0) diff = -diff;
+                if (diff <= 60) {
+                    found = 1;
+                    break;
+                }
+            }
+            if (found) {
+                print client, xid;
+            }
+        }
+    }
+}
+' data/logs/dhcp
+  precision=0.9993 recall=1.0000 f1=0.9996 TP=4280 FP=3 FN=0 returned=4283 must=4280
+  may_precision=0.9993 may_recall=1.0000 may_f1=0.9996 may_TP=4280 may_FP=3 may_FN=0 may=4280
+  retries=0
+  input_tokens=20367 output_tokens=747
+  elapsed_seconds=135.27
+
+ID: multiline_17 | type: select | query: Identify DHCP exchanges where the client received at least two OFFERs from different servers before getting an ACK. Return the client hostname, process id, transaction id, timestamp of the event, list of server ips, and ACKed server for each instance.
+  requested output format=client,process_id,transaction_id,ack_timestamp,offer_server_ips,ack_server_ip
+  requested output data type=string,integer,string,float,array[string],string
+  command: awk '
+BEGIN {
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+function clear_state(k,    i) {
+    for (i=1; i<=num_offers[k]; i++) {
+        delete offers_list[k, i];
+    }
+    num_offers[k] = 0;
+    delete current_xid[k];
+}
+{
+    # Check if this is a dhclient line
+    if ($5 !~ /^dhclient(\[[0-9]+\])?:/) next;
+    
+    month = $1; day = $2; time = $3; host = $4;
+    
+    # Extract PID
+    pid = "none";
+    if (match($5, /\[[0-9]+\]/)) {
+        pid = substr($5, RSTART+1, RLENGTH-2);
+    }
+    
+    key = host ":" pid;
+    
+    # Extract Transaction ID (xid) if present
+    xid = "";
+    if (match($0, /\(xid=[^)]+\)/)) {
+        xid = substr($0, RSTART+5, RLENGTH-6);
+        current_xid[key] = xid;
+    }
+    
+    # Clear state on messages that begin a new exchange or interrupt one
+    if ($0 ~ /DHCPDISCOVER|DHCPDECLINE|DHCPRELEASE|DHCPNAK/) {
+        clear_state(key);
+        if (xid != "") current_xid[key] = xid;
+    }
+    
+    # Record unique DHCPOFFERs
+    if (match($0, /DHCPOFFER from [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)) {
+        ip = substr($0, RSTART+15, RLENGTH-15);
+        found = 0;
+        for (i=1; i<=num_offers[key]; i++) {
+            if (offers_list[key, i] == ip) {
+                found = 1; break;
+            }
+        }
+        if (!found) {
+            num_offers[key]++;
+            offers_list[key, num_offers[key]] = ip;
+        }
+    }
+    
+    # On DHCPACK, verify state and emit if we saw at least 2 distinct offers
+    if (match($0, /DHCPACK from [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)) {
+        ack_ip = substr($0, RSTART+13, RLENGTH-13);
+        curr_xid = (xid != "") ? xid : current_xid[key];
+        
+        if (num_offers[key] >= 2 && curr_xid != "" && pid != "none") {
+            split(time, t, ":");
+            # Fixed year 2000 as per constraints (no year rollover assumption)
+            ts = mktime("2000 " m[month] " " day " " t[1] " " t[2] " " t[3]);
+            
+            offer_str = "[";
+            for (i=1; i<=num_offers[key]; i++) {
+                offer_str = offer_str offers_list[key, i];
+                if (i < num_offers[key]) offer_str = offer_str ",";
+            }
+            offer_str = offer_str "]";
+            
+            print host, pid, curr_xid, ts, offer_str, ack_ip;
+        }
+        
+        # Exchange complete, reset state
+        clear_state(key);
+    }
+}' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=0 FP=0 FN=0 returned=0 must=0
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=0 may_FP=0 may_FN=0 may=0
+  retries=0
+  input_tokens=20490 output_tokens=1038
+  elapsed_seconds=105.25
+
+ID: multiline_18 | type: select | query: Are there any cases where two different clients were assigned the same IP address at exactly the same timestamp?
+  requested output format=assigned_ip,timestamp,clients
+  requested output data type=string,float,array[string]
+  command: awk 'BEGIN { m["Jan"]=1; m["Feb"]=2; m["Mar"]=3; m["Apr"]=4; m["May"]=5; m["Jun"]=6; m["Jul"]=7; m["Aug"]=8; m["Sep"]=9; m["Oct"]=10; m["Nov"]=11; m["Dec"]=12; } ($1 in m) { ip=""; for(i=5; i<=NF; i++){ if ($i=="bound" && $(i+1)=="to") { ip=$(i+2); break; } } if (ip!="" && ip!="--") { split($3, t, ":"); ts = mktime("2000 " m[$1] " " $2 " " t[1] " " t[2] " " t[3]); key = ip SUBSEP ts; if (!(key SUBSEP $4 in seen)) { seen[key SUBSEP $4] = 1; if (count[key] == 0) { hosts[key] = "\"" $4 "\""; } else { hosts[key] = hosts[key] ",\"" $4 "\""; } count[key]++; } } } END { for (key in count) { if (count[key] > 1) { split(key, k, SUBSEP); print k[1], k[2], "[" hosts[key] "]"; } } }' data/logs/dhcp
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=0 FP=0 FN=0 returned=0 must=0
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=0 may_FP=0 may_FN=0 may=0
+  retries=0
+  input_tokens=20411 output_tokens=385
+  elapsed_seconds=83.79
+
+ID: multiline_19 | type: select | query: Are there any transactions (same client and transaction ID) where DISCOVER, OFFER, REQUEST, and ACK all occurred at exactly the same timestamp?
+  requested output format=client,transaction_id,timestamp
+  requested output data type=string,string,float
+  command: awk '
+BEGIN {
+    # Month mapping for timestamp conversion
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+{
+    # Skip invalid log lines
+    if (!($1 in m)) next;
+    
+    # Parse Unix timestamp
+    split($3, t, ":");
+    ts = mktime("2000 " m[$1] " " $2 " " t[1] " " t[2] " " t[3]);
+    client = $4;
+    
+    # Extract PID if present
+    pid = "";
+    if (match($0, /dhclient\[[0-9]+\]/)) {
+        pid = substr($0, RSTART+9, RLENGTH-10);
+    }
+    
+    # Extract XID if present
+    xid = "";
+    if (match($0, /xid=0x[0-9a-fA-F]+/)) {
+        xid = substr($0, RSTART+4, RLENGTH-4);
+    }
+    
+    # Check for relevant events
+    has_disc = ($0 ~ /DHCPDISCOVER/);
+    has_offer = ($0 ~ /DHCPOFFER from/);
+    has_req = ($0 ~ /DHCPREQUEST/);
+    has_ack = ($0 ~ /DHCPACK/);
+    
+    if (has_disc || has_offer || has_req || has_ack) {
+        idx++;
+        events[idx, "ts"] = ts;
+        events[idx, "client"] = client;
+        events[idx, "pid"] = pid;
+        events[idx, "xid"] = xid;
+        events[idx, "disc"] = has_disc;
+        events[idx, "offer"] = has_offer;
+        events[idx, "req"] = has_req;
+        events[idx, "ack"] = has_ack;
+        
+        # Build mapping for missing XID inference
+        if (xid != "") {
+            if (pid != "") {
+                if ((client, pid, ts) in map_c_p_t) {
+                    if (map_c_p_t[client, pid, ts] != xid) {
+                        map_c_p_t[client, pid, ts] = "AMBIGUOUS";
+                    }
+                } else {
+                    map_c_p_t[client, pid, ts] = xid;
+                }
+            }
+            if ((client, ts) in map_c_t) {
+                if (map_c_t[client, ts] != xid) {
+                    map_c_t[client, ts] = "AMBIGUOUS";
+                }
+            } else {
+                map_c_t[client, ts] = xid;
+            }
+        }
+    }
+}
+END {
+    # Resolve XIDs and aggregate by transaction
+    for (i=1; i<=idx; i++) {
+        ts = events[i, "ts"];
+        client = events[i, "client"];
+        pid = events[i, "pid"];
+        xid = events[i, "xid"];
+        
+        # Infer missing XID (e.g., for DHCPOFFER)
+        if (xid == "") {
+            if (pid != "" && map_c_p_t[client, pid, ts] != "" && map_c_p_t[client, pid, ts] != "AMBIGUOUS") {
+                xid = map_c_p_t[client, pid, ts];
+            } else if (map_c_t[client, ts] != "" && map_c_t[client, ts] != "AMBIGUOUS") {
+                xid = map_c_t[client, ts];
+            }
+        }
+        
+        # Record event in transaction
+        if (xid != "") {
+            key = client SUBSEP xid SUBSEP ts;
+            if (events[i, "disc"]) txn_disc[key]=1;
+            if (events[i, "offer"]) txn_offer[key]=1;
+            if (events[i, "req"]) txn_req[key]=1;
+            if (events[i, "ack"]) txn_ack[key]=1;
+        }
+    }
+    
+    # Output transactions with all 4 events
+    for (key in txn_disc) {
+        if (txn_disc[key] && txn_offer[key] && txn_req[key] && txn_ack[key]) {
+            split(key, arr, SUBSEP);
+            print arr[1], arr[2], arr[3];
+        }
+    }
+}
+' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=676 FN=743 returned=676 must=743
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=676 may_FN=743 may=743
+  retries=0
+  input_tokens=20417 output_tokens=1273
+  elapsed_seconds=131.71
+
+ID: multiline_20 | type: select | query: Associate each assigned IP with the MAC address reported for that client/process stream, and return the timestamp, client MAC, and assigned IP.
+  requested output format=timestamp,client_mac,assigned_ip
+  requested output data type=float,string,string
+  command: awk '
+BEGIN {
+    # Month map for date to unix timestamp conversion
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+{
+    # Validate and parse syslog header
+    if ($1 in m && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+:[0-9]+:[0-9]+$/) {
+        mon = $1; day = $2; time = $3;
+        host = $4;
+        prog = $5;
+        msg_start = 6;
+    } else {
+        next;
+    }
+
+    # Extract the process ID for dhclient, if present
+    pid = "NO_PID";
+    if (prog ~ /^dhclient\[[0-9]+\]:?$/) {
+        match(prog, /\[[0-9]+\]/);
+        pid = substr(prog, RSTART+1, RLENGTH-2);
+    } else if (prog ~ /^dhclient:?$/) {
+        pid = "NO_PID";
+    } else {
+        # Not a dhclient log we can parse
+        next;
+    }
+
+    # Client identifier combining host and PID
+    client = host "_" pid;
+
+    # Capture MAC address reported during Listening/Sending phase
+    if ($0 ~ / (Listening|Sending) on +LPF\//) {
+        for (i=msg_start; i<=NF; i++) {
+            if ($i ~ /^LPF\//) {
+                split($i, parts, "/");
+                # Ensure MAC address is present and valid
+                if (parts[3] ~ /^[0-9a-fA-F:]+$/) {
+                    client_mac[client] = parts[3];
+                    client_mac_host[host] = parts[3]; # Fallback
+                }
+            }
+        }
+    }
+
+    # Identify when an IP is successfully assigned
+    if ($0 ~ / bound to /) {
+        ip = "";
+        for (i=msg_start; i<=NF; i++) {
+            if ($i == "bound" && $(i+1) == "to") {
+                ip = $(i+2);
+                # Clean up any trailing punctuation
+                sub(/[^a-fA-F0-9\.:]+$/, "", ip);
+                break;
+            }
+        }
+        
+        # If we successfully parsed an assigned IP
+        if (ip != "") {
+            mac = "";
+            # Attempt to resolve MAC by client stream first, then by host
+            if (client_mac[client] != "") {
+                mac = client_mac[client];
+            } else if (client_mac_host[host] != "") {
+                mac = client_mac_host[host];
+            }
+            
+            # Emit the final record if we found the associated MAC
+            if (mac != "") {
+                split(time, t, ":");
+                # Assume year 2000 per constraints to avoid rollover issues
+                ts = mktime("2000 " m[mon] " " day " " t[1] " " t[2] " " t[3]);
+                print ts, mac, ip;
+            }
+        }
+    }
+}
+' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=21712 FN=14605 returned=21712 must=14605
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=21712 may_FN=14605 may=14605
+  retries=1
+  input_tokens=41013 output_tokens=1388
+  elapsed_seconds=193.89
+
+ID: multiline_21 | type: select | query: Find DHCP renewals where a DHCPREQUEST occurs within 25% of the stated renewal time after the lease was bound in the same host/process stream. Return the hostname, assigned IP, and elapsed seconds from the bound event to the REQUEST.
+  requested output format=hostname,assigned_ip,lease_renewal_time_seconds
+  requested output data type=string,string,float
+  command: awk '
+BEGIN {
+    # Map month abbreviations to numerical strings for mktime
+    m["Jan"]="01"; m["Feb"]="02"; m["Mar"]="03"; m["Apr"]="04"; m["May"]="05"; m["Jun"]="06";
+    m["Jul"]="07"; m["Aug"]="08"; m["Sep"]="09"; m["Oct"]="10"; m["Nov"]="11"; m["Dec"]="12";
+}
+# Only process lines originating from dhclient
+$5 ~ /^dhclient(\[[0-9]+\])?:/ {
+    mstr = $1; day = $2; time = $3; host = $4; proc = $5;
+    
+    # Clean up process name to form the stream identifier (host|proc)
+    sub(/:$/, "", proc);
+    stream = host "|" proc;
+    
+    # Parse timestamp into epoch seconds (assuming year 2000 as per constraints)
+    split(time, t, ":");
+    ts = mktime("2000 " m[mstr] " " day " " t[1] " " t[2] " " t[3]);
+    
+    # Check if the log is a "bound to" event
+    idx = index($0, "bound to ");
+    if (idx > 0) {
+        sub_str = substr($0, idx + 9);
+        split(sub_str, words, " ");
+        ip_val = words[1]; # Assigned IP
+        
+        # Extract the renewal duration
+        match_idx = index(sub_str, "renewal in ");
+        if (match_idx > 0) {
+            dur_str = substr(sub_str, match_idx + 11);
+            split(dur_str, dur_words, " ");
+            dur = dur_words[1];
+            
+            # Store state for this stream if IP is valid
+            if (ip_val != "--" && ip_val != "") {
+                ip[stream] = ip_val;
+                renew_ts[stream] = ts;
+                renew_dur[stream] = dur;
+            }
+        }
+    }
+    # Check if the log is a DHCPREQUEST event
+    else if (index($0, "DHCPREQUEST") > 0) {
+        if (stream in renew_ts) {
+            elapsed = ts - renew_ts[stream];
+            dur = renew_dur[stream];
+            
+            # If request occurs within 25% of the stated renewal time
+            if (elapsed >= 0 && elapsed <= dur * 0.25) {
+                # Output: hostname, assigned_ip, elapsed_seconds
+                print host, ip[stream], elapsed;
+                
+                # Delete state to avoid duplicate matches for the same bind
+                delete renew_ts[stream];
+            }
+        }
+    }
+}' data/logs/dhcp
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=2221 FN=4356 returned=2221 must=4356
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=2221 may_FN=4356 may=4356
+  retries=0
+  input_tokens=20455 output_tokens=768
+  elapsed_seconds=173.07
+
+# Macro Averages (where/select queries)
+# precision=0.4813 recall=0.4299 f1=0.4461
+# may_precision=0.4813 may_recall=0.4299 may_f1=0.4461
+# retries_total=1 retries_avg=0.05
+# total_input_tokens=449088 total_output_tokens=15359
+# total_elapsed=2507.12s avg_elapsed=119.39s
+# Worst 5 queries by f1
+# 1. multiline_1 | type: select | f1=0.0000 | query: Find transactions where time from DHCPREQUEST to DHCPACK exceeds 5 seconds. Return a list of pairs of transaction ids and duration.
+# 2. multiline_2 | type: select | f1=0.0000 | query: Find hosts issuing >100 DHCPREQUESTs within any 30-minute rolling window. Report the times of the first and last REQUEST of the first such window with the largest number of requests for each host.
+# 3. multiline_4 | type: select | f1=0.0000 | query: For each client that sent at least one DHCPDISCOVER with an explicit transaction ID, count how many transaction IDs begin with DHCPDISCOVER, how many of those later contain DHCPACK, and the resulting completion rate.
+# 4. multiline_5 | type: select | f1=0.0000 | query: Considering only client/process streams that contain DHCPDISCOVER, DHCPOFFER, DHCPREQUEST, and DHCPACK, return for each client the average elapsed seconds between the DISCOVER and ACK.
+# 5. multiline_6 | type: select | f1=0.0000 | query: For each DHCP server IP address, count the total number of OFFER messages sent. Then count how many of those OFFER messages resulted in a corresponding ACK within 60 seconds for the same transaction. Compute the conversion rate.

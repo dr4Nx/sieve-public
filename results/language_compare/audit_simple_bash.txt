@@ -1,0 +1,185 @@
+# Evaluation report generated 20260429-144348
+# Source JSON: queries/audit_simple.json
+# Log file input: data/logs/audit
+# Log file resolved: data/logs/audit
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/audit.json
+# Queries evaluated: 12
+
+ID: audit_query_1 | type: where | query: Find audit log lines that report SELinux AVC denials.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines containing SELinux AVC denials, allowing for variable whitespace
+/avc:[[:space:]]+denied/ {
+    print $0
+}
+' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=16917 FP=0 FN=0 returned=16917 must=16917
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=16917 may_FP=0 may_FN=0 may=16917
+  retries=0
+  input_tokens=127097 output_tokens=75
+  elapsed_seconds=29.5
+
+ID: audit_query_2 | type: where | query: Find audit log lines that show SELinux policy loads.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/policy loaded|policyload notice|MAC_POLICY_LOAD|type=1403|comm="load_policy"/' data/logs/audit
+  precision=0.9386 recall=1.0000 f1=0.9683 TP=7439 FP=487 FN=0 returned=7926 must=7439
+  may_precision=0.9386 may_recall=1.0000 may_f1=0.9683 may_TP=7439 may_FP=487 may_FN=0 may=7439
+  retries=1
+  input_tokens=254227 output_tokens=183
+  elapsed_seconds=56.68
+
+ID: audit_query_3 | type: where | query: Find audit log lines that show SELinux boolean changes.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Find SELinux boolean changes by looking for the bool= key or the specific MAC_CONFIG_CHANGE/1405 types.
+/(^|[^a-zA-Z0-9_])bool=/ || /type=(1405|MAC_CONFIG_CHANGE)/ {
+    print $0
+}' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=70 FP=0 FN=0 returned=70 must=70
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=70 may_FP=0 may_FN=0 may=70
+  retries=0
+  input_tokens=127097 output_tokens=107
+  elapsed_seconds=32.17
+
+ID: audit_query_4 | type: where | query: Find audit log lines that show SELinux enforcing mode changes.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/type=(1404|MAC_STATUS)/ || /enforcing=[0-9]+ old_enforcing=[0-9]+/ || / selinux=[0-9]+/ || /avc: received setenforce notice/' data/logs/audit
+  precision=0.8616 recall=1.0000 f1=0.9257 TP=7029 FP=1129 FN=0 returned=8158 must=7029
+  may_precision=0.8616 may_recall=1.0000 may_f1=0.9257 may_TP=7029 may_FP=1129 may_FN=0 may=7029
+  retries=0
+  input_tokens=127098 output_tokens=76
+  elapsed_seconds=36.39
+
+ID: audit_query_5 | type: where | query: Find audit log lines showing kernel audit initialization events.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '# Match kernel audit initialization events
+/type=2000/ && /initialized/ { print $0 }' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=9535 FP=0 FN=0 returned=9535 must=9535
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=9535 may_FP=0 may_FN=0 may=9535
+  retries=0
+  input_tokens=127095 output_tokens=61
+  elapsed_seconds=27.11
+
+ID: audit_query_6 | type: where | query: Find audit log lines that record the audit daemon process ID being set or changed.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '# Match audit log lines recording a change to the audit daemon process ID
+/audit_pid=[0-9]+/' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=3554 FP=0 FN=0 returned=3554 must=3554
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=3554 may_FP=0 may_FN=0 may=3554
+  retries=0
+  input_tokens=127101 output_tokens=51
+  elapsed_seconds=31.98
+
+ID: audit_query_7 | type: where | query: Find audit log lines for failed SSH authentication attempts handled by sshd.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/sshd/ && /res=failed/ && /(auth|AUTH|login|LOGIN|pubkey|password|type=1100|type=1112)/' data/logs/audit
+  precision=1.0000 recall=0.9975 f1=0.9987 TP=1186 FP=0 FN=3 returned=1186 must=1189
+  may_precision=1.0000 may_recall=0.9975 may_f1=0.9987 may_TP=1186 may_FP=0 may_FN=3 may=1189
+  retries=0
+  input_tokens=127099 output_tokens=65
+  elapsed_seconds=42.39
+
+ID: audit_query_8 | type: where | query: Find audit log lines for PAM session open events.
+  output_format_note=ignored output_format for query_type=where
+  command: awk 'tolower($0) ~ /pam:[ \t]*session[_ -]open/' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2579 FP=0 FN=0 returned=2579 must=2579
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2579 may_FP=0 may_FN=0 may=2579
+  retries=0
+  input_tokens=127095 output_tokens=53
+  elapsed_seconds=28.06
+
+ID: audit_query_9 | type: where | query: Find audit log lines for systemd unit start events that name a service unit.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/type=(1130|SERVICE_START)[[:space:]]/ && /unit=/' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2717 FP=0 FN=0 returned=2717 must=2717
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2717 may_FP=0 may_FN=0 may=2717
+  retries=0
+  input_tokens=127101 output_tokens=46
+  elapsed_seconds=31.15
+
+ID: audit_select_1 | type: select | query: Find the hosts that logged SELinux AVC denials.
+  requested output format=host
+  requested output data type=string
+  command: awk '
+/avc:[ \t]+denied/ {
+    h = ""
+    for(i=1; i<=NF; i++) {
+        if (match($i, /node=/)) {
+            h = substr($i, RSTART+RLENGTH)
+            break
+        }
+    }
+    
+    if (h == "") {
+        if ($2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]{2}:[0-9]{2}:[0-9]{2}/) {
+            h = $4
+        } else if ($1 ~ /(^|:)[0-9]{4}-[0-9]{2}-[0-9]{2}T?[0-9]{2}:[0-9]{2}:[0-9]{2}/) {
+            h = $2
+        } else if ($1 ~ /(^|:)[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?$/ && $2 !~ /^(kernel|kernel:|type=|\[|setroubleshoot|audit:|audit_log:|klogd:)/) {
+            h = $2
+        }
+    }
+    
+    gsub(/:/, "", h)
+    gsub(/\[/, "", h)
+    gsub(/\]/, "", h)
+    gsub(/\)/, "", h)
+    gsub(/"/, "", h)
+    gsub(/\x27/, "", h)
+    if (h != "" && h !~ /^(kernel|audit|setroubleshoot|type|dbus|msg|avc|klogd|audit_log)$/) {
+        if (!seen[h]++) {
+            print h
+        }
+    }
+}
+' data/logs/audit
+  precision=0.9688 recall=0.9827 f1=0.9757 TP=341 FP=11 FN=6 returned=352 must=347
+  may_precision=0.9688 may_recall=0.9827 may_f1=0.9757 may_TP=341 may_FP=11 may_FN=6 may=347
+  retries=0
+  input_tokens=127262 output_tokens=440
+  elapsed_seconds=194.7
+
+ID: audit_select_2 | type: select | query: Find the SELinux boolean names that were changed.
+  requested output format=boolean_name
+  requested output data type=string
+  command: awk '
+# Match SELinux boolean configuration changes (type 1405 or MAC_CONFIG_CHANGE)
+/type=1405|type=MAC_CONFIG_CHANGE/ && /bool=/ {
+    # Extract the boolean name
+    match($0, /bool=[^ ]+/)
+    if (RSTART > 0) {
+        print substr($0, RSTART+5, RLENGTH-5)
+    }
+}' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=17 FP=0 FN=0 returned=17 must=17
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=17 may_FP=0 may_FN=0 may=17
+  retries=0
+  input_tokens=127266 output_tokens=125
+  elapsed_seconds=26.46
+
+ID: audit_select_3 | type: select | query: Find the service unit names reported in systemd unit start events.
+  requested output format=service_unit
+  requested output data type=string
+  command: awk '/(^|[[:space:]])type=(1130|SERVICE_START)([[:space:]:]|$)/ { if (match($0, /unit=[^[:space:]]+/)) { val = substr($0, RSTART+5, RLENGTH-5); gsub(/[\x27"]/, "", val); if (val != "") print val } }' data/logs/audit
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=216 FP=0 FN=0 returned=216 must=216
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=216 may_FP=0 may_FN=0 may=216
+  retries=1
+  input_tokens=254569 output_tokens=231
+  elapsed_seconds=117.59
+
+# Macro Averages (where/select queries)
+# precision=0.9807 recall=0.9983 f1=0.9890
+# may_precision=0.9807 may_recall=0.9983 may_f1=0.9890
+# retries_total=2 retries_avg=0.17
+# total_input_tokens=1780107 total_output_tokens=1513
+# total_elapsed=654.18s avg_elapsed=54.51s
+# Worst 5 queries by f1
+# 1. audit_query_4 | type: where | f1=0.9257 | query: Find audit log lines that show SELinux enforcing mode changes.
+# 2. audit_query_2 | type: where | f1=0.9683 | query: Find audit log lines that show SELinux policy loads.
+# 3. audit_select_1 | type: select | f1=0.9757 | query: Find the hosts that logged SELinux AVC denials.
+# 4. audit_query_7 | type: where | f1=0.9987 | query: Find audit log lines for failed SSH authentication attempts handled by sshd.
+# 5. audit_query_1 | type: where | f1=1.0000 | query: Find audit log lines that report SELinux AVC denials.

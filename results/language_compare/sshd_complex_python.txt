@@ -1,0 +1,821 @@
+# Evaluation report generated 20260429-141633
+# Source JSON: queries/sshd_complex.json
+# Log file input: data/logs/sshd
+# Log file resolved: data/logs/sshd
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/sshd.json
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+  requested output format=source_ip,failure_count,distinct_usernames_targeted
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+from collections import defaultdict
+import ipaddress
+import gzip
+
+class Session:
+    def __init__(self):
+        self.ips = set()
+        self.failed_usernames = set()
+        self.failed_lines = 0
+        self.pam_auth = 0
+        self.pam_more = 0
+        self.pam_err = 0
+        self.invalid_user = 0
+        self.bad_user = 0
+        self.input_inv = 0
+        self.closed = False
+
+def clean_ip(ip_str):
+    ip_str = ip_str.strip()
+    if ip_str.endswith(':'):
+        ip_str = ip_str[:-1]
+    if ip_str.startswith('['):
+        ip_str = ip_str[1:]
+    if ip_str.endswith(']'):
+        ip_str = ip_str[:-1]
+    return ip_str
+
+def get_best_ip(ips):
+    real_ips = []
+    for ip in ips:
+        try:
+            ipaddress.ip_address(ip)
+            real_ips.append(ip)
+        except ValueError:
+            pass
+    if real_ips:
+        return sorted(real_ips)[0]
+    elif ips:
+        return sorted(ips)[0]
+    return None
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    filepath = sys.argv[1]
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    
+    sessions_by_pid = defaultdict(list)
+    
+    with open_func(filepath, 'rt', errors='replace') as f:
+        for line in f:
+            parts = line.split('sshd', 1)
+            if len(parts) < 2:
+                continue
+                
+            left = parts[0].strip().split()
+            host = left[-1] if left else "unknown"
+            
+            right = parts[1]
+            m = re.match(r'(?:\([^)]+\))?(?:\[(\d+)\])?:\s*(.*)', right)
+            if not m:
+                continue
+                
+            pid = m.group(1) or "unknown"
+            message = m.group(2).strip()
+            
+            if not sessions_by_pid[(host, pid)]:
+                sessions_by_pid[(host, pid)].append(Session())
+            
+            session = sessions_by_pid[(host, pid)][-1]
+            if session.closed:
+                session = Session()
+                sessions_by_pid[(host, pid)].append(session)
+                
+            ip = None
+            user = None
+            is_failed = 0
+            is_pam_auth = 0
+            pam_more = 0
+            is_pam_err = 0
+            is_invalid_user = 0
+            is_bad_user = 0
+            is_input_inv = 0
+            is_close = 0
+            
+            if "authentication failure;" in message:
+                is_pam_auth = 1
+                m_rhost = re.search(r'rhost=([^\s]+)', message)
+                if m_rhost: ip = m_rhost.group(1)
+                m_user = re.search(r'user=([^\s]+)', message)
+                if m_user: user = m_user.group(1)
+                
+            m_more = re.search(r'(?:PAM )?(\d+) more authentication failures?;', message)
+            if m_more:
+                pam_more = int(m_more.group(1))
+                m_rhost = re.search(r'rhost=([^\s]+)', message)
+                if m_rhost: ip = m_rhost.group(1)
+                m_user = re.search(r'user=([^\s]+)', message)
+                if m_user: user = m_user.group(1)
+                
+            m_fail = re.search(r'Failed \S+ for (?:invalid user )?([^\s]+) from ([^\s]+)', message)
+            if m_fail:
+                is_failed = 1
+                user = m_fail.group(1)
+                ip = m_fail.group(2)
+                
+            m_err = re.search(r'error: PAM: Authentication failure for ([^\s]+) from ([^\s]+)', message)
+            if m_err:
+                is_pam_err = 1
+                user = m_err.group(1)
+                ip = m_err.group(2)
+                
+            m_inv = re.search(r'Invalid user ([^\s]+) from ([^\s]+)', message)
+            if m_inv:
+                is_invalid_user = 1
+                user = m_inv.group(1)
+                ip = m_inv.group(2)
+                
+            m_bad = re.search(r'bad username \[([^\]]+)\]', message)
+            if m_bad:
+                is_bad_user = 1
+                user = m_bad.group(1)
+                
+            m_input_inv = re.search(r'input_userauth_request: invalid user ([^\s]+)', message)
+            if m_input_inv:
+                is_input_inv = 1
+                user = m_input_inv.group(1)
+                
+            m_conn = re.search(r'Connection from ([^\s]+)', message)
+            if m_conn:
+                ip = m_conn.group(1)
+                
+            m_close_match = re.search(r'(?:Connection closed by|Connection reset by|Received disconnect from|Disconnected from) ([^\s]+)', message)
+            if m_close_match:
+                ip = m_close_match.group(1)
+                if ip == "remote":
+                    ip = None
+                is_close = 1
+                
+            m_ident = re.search(r'Did not receive identification string from ([^\s]+)', message)
+            if m_ident:
+                ip = m_ident.group(1)
+                is_close = 1
+                
+            m_bad_proto = re.search(r'Bad protocol version identification .* from ([^\s]+)', message)
+            if m_bad_proto:
+                ip = m_bad_proto.group(1)
+                is_close = 1
+                
+            m_closing = re.search(r'Closing connection to ([^\s]+)', message)
+            if m_closing:
+                ip = m_closing.group(1)
+                is_close = 1
+                
+            m_map = re.search(r'Address ([^\s]+) maps to', message)
+            if m_map:
+                ip = m_map.group(1)
+                
+            m_rev = re.search(r'\[([^\s]+)\] failed - POSSIBLE BREAK', message)
+            if m_rev:
+                ip = m_rev.group(1)
+                
+            if "fatal:" in message or "Exiting on signal" in message:
+                is_close = 1
+                
+            m_acc = re.search(r'Accepted \S+ for ([^\s]+) from ([^\s]+)', message)
+            if m_acc:
+                user = m_acc.group(1)
+                ip = m_acc.group(2)
+                
+            if ip:
+                ip = clean_ip(ip)
+                if ip:
+                    session.ips.add(ip)
+            
+            is_failure_line = is_failed or is_pam_auth or pam_more > 0 or is_pam_err or is_invalid_user or is_bad_user or is_input_inv
+            if is_failure_line and user:
+                session.failed_usernames.add(user)
+                
+            session.failed_lines += is_failed
+            session.pam_auth += is_pam_auth
+            session.pam_more += pam_more
+            session.pam_err += is_pam_err
+            session.invalid_user += is_invalid_user
+            session.bad_user += is_bad_user
+            session.input_inv += is_input_inv
+            
+            if is_close:
+                session.closed = True
+
+    ip_failures = defaultdict(int)
+    ip_usernames = defaultdict(set)
+    
+    for (host, pid), sessions in sessions_by_pid.items():
+        for session in sessions:
+            failures = max(
+                session.failed_lines,
+                session.pam_auth + session.pam_more,
+                session.pam_err,
+                session.invalid_user,
+                session.bad_user,
+                session.input_inv
+            )
+            if failures > 0:
+                ip = get_best_ip(session.ips)
+                if ip:
+                    ip_failures[ip] += failures
+                    ip_usernames[ip].update(session.failed_usernames)
+                    
+    for ip, count in ip_failures.items():
+        if count > 0:
+            print(f"{ip} {count} {len(ip_usernames[ip])}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.7021 recall=0.8148 f1=0.7543 TP=66 FP=28 FN=15 returned=94 must=81
+  may_precision=0.7021 may_recall=0.8148 may_f1=0.7543 may_TP=66 may_FP=28 may_FN=15 may=81
+  retries=0
+  input_tokens=15625 output_tokens=2322
+  elapsed_seconds=243.01
+
+ID: multiline_2 | type: select | query: Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.
+  requested output format=source_ip,peak_failures_in_5min
+  requested output data type=string,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+import datetime
+
+def parse_time(month_str, day_str, time_str, current_year, last_month_idx):
+    month_map = {
+        'jan': 1, 'janv': 1, '1月': 1,
+        'feb': 2, 'févr': 2, '2月': 2,
+        'mar': 3, 'mars': 3, '3月': 3,
+        'apr': 4, 'avr': 4, '4月': 4,
+        'may': 5, 'mai': 5, '5月': 5,
+        'jun': 6, 'juin': 6, '6月': 6,
+        'jul': 7, 'juil': 7, '7月': 7,
+        'aug': 8, 'août': 8, '8月': 8,
+        'sep': 9, 'sept': 9, '9月': 9,
+        'oct': 10, '10月': 10,
+        'nov': 11, '11月': 11,
+        'dec': 12, 'déc': 12, '12月': 12
+    }
+    m_str = month_str.lower().strip('.')
+    m_num = 1
+    for k, v in month_map.items():
+        if m_str.startswith(k):
+            m_num = v
+            break
+            
+    if last_month_idx is not None and m_num < last_month_idx:
+        current_year += 1
+        
+    day = int(day_str)
+    H, M, S = map(int, time_str.split(':'))
+    
+    try:
+        dt = datetime.datetime(current_year, m_num, day, H, M, S, tzinfo=datetime.timezone.utc)
+    except ValueError:
+        if m_num == 2 and day == 29:
+            y = current_year
+            while not (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)):
+                y += 1
+            dt = datetime.datetime(y, m_num, day, H, M, S, tzinfo=datetime.timezone.utc)
+        else:
+            dt = datetime.datetime(current_year, m_num, max(1, min(day, 28)), H, M, S, tzinfo=datetime.timezone.utc)
+            
+    return dt.timestamp(), m_num, current_year
+
+def extract_event(msg):
+    m = re.search(r'(?:PAM )?(?P<count>\d+)\s+more authentication failure[s]?;.*?rhost=(?P<ip>\S+)', msg)
+    if m:
+        ip = m.group('ip')
+        if not ip.startswith('user='):
+            return 'pam_more_fail', ip, int(m.group('count'))
+            
+    m = re.search(r'authentication failure;.*?rhost=(?P<ip>\S+)', msg)
+    if m:
+        ip = m.group('ip')
+        if not ip.startswith('user='):
+            return 'pam_auth_fail', ip, 1
+            
+    m = re.search(r'Failed\s+(?:\S+)\s+for\s+(?:invalid user\s+)?(?:.*?)\s+from\s+(?P<ip>\S+)', msg)
+    if m:
+        return 'sshd_failed', m.group('ip'), 1
+        
+    m = re.search(r'error: PAM: Authentication failure for\s+(?:.*?)\s+from\s+(?P<ip>\S+)', msg)
+    if m:
+        return 'pam_error', m.group('ip'), 1
+        
+    m = re.search(r'^Invalid user\s+(?:.*?)\s+from\s+(?P<ip>\S+)', msg)
+    if m:
+        return 'invalid_user', m.group('ip'), 1
+        
+    return None, None, 0
+
+def process_file(file_path):
+    transactions = defaultdict(list)
+    current_year = 2000
+    last_month_idx = None
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) < 5: continue
+            
+            month_str = parts[0]
+            day_str = parts[1]
+            time_str = parts[2]
+            host = parts[3]
+            
+            pid = None
+            msg_start = 4
+            for i in range(4, min(8, len(parts))):
+                if 'sshd' in parts[i]:
+                    m = re.search(r'\[(\d+)\]', parts[i])
+                    if m:
+                        pid = m.group(1)
+                    msg_start = i + 1
+                    break
+                    
+            if not pid:
+                for i in range(4, min(8, len(parts))):
+                    m = re.search(r'\[(\d+)\]', parts[i])
+                    if m:
+                        pid = m.group(1)
+                        msg_start = i + 1
+                        break
+            if not pid:
+                continue
+                
+            msg = " ".join(parts[msg_start:]).lstrip(' :')
+            ev_type, ip, count = extract_event(msg)
+            
+            if ev_type:
+                if not re.match(r'\d{2}:\d{2}:\d{2}', time_str) or not day_str.isdigit():
+                    continue
+                ts, m_num, current_year = parse_time(month_str, day_str, time_str, current_year, last_month_idx)
+                last_month_idx = m_num
+                
+                transactions[(host, pid)].append({
+                    'ts': ts,
+                    'type': ev_type,
+                    'ip': ip,
+                    'count': count
+                })
+                
+    ip_batches = defaultdict(list)
+    for (host, pid), events in transactions.items():
+        if not events: continue
+        ip = events[0]['ip']
+        first_ts = min(e['ts'] for e in events)
+        
+        sshd_c = sum(1 for e in events if e['type'] == 'sshd_failed')
+        pam_c = sum(1 for e in events if e['type'] == 'pam_auth_fail')
+        pam_more = sum(e['count'] for e in events if e['type'] == 'pam_more_fail')
+        pam_err = sum(1 for e in events if e['type'] == 'pam_error')
+        inv_c = sum(1 for e in events if e['type'] == 'invalid_user')
+        
+        total_failures = max(sshd_c, pam_c + pam_more, pam_err, inv_c)
+        if total_failures > 0:
+            ip_batches[ip].append((first_ts, total_failures))
+            
+    for ip, batches in ip_batches.items():
+        batches.sort(key=lambda x: x[0])
+        peak_failures = 0
+        
+        for i in range(len(batches)):
+            start_ts = batches[i][0]
+            window_sum = 0
+            for j in range(i, len(batches)):
+                if batches[j][0] <= start_ts + 300:
+                    window_sum += batches[j][1]
+                else:
+                    break
+            if window_sum > peak_failures:
+                peak_failures = window_sum
+                
+        if peak_failures >= 10:
+            print(f"{ip} {peak_failures}")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.9375 recall=0.9375 f1=0.9375 TP=15 FP=1 FN=1 returned=16 must=16
+  may_precision=0.9375 may_recall=0.9375 may_f1=0.9375 may_TP=15 may_FP=1 may_FN=1 may=16
+  retries=0
+  input_tokens=15617 output_tokens=2086
+  elapsed_seconds=224.69
+
+ID: multiline_3 | type: select | query: Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.
+  requested output format=source_ip,distinct_usernames
+  requested output data type=string,integer
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    filepath = sys.argv[1]
+    
+    # regexes where (user, ip) are captured in order
+    rx_failed_auth = re.compile(r'Failed \S+ for (?:invalid user )?([^\s]+) from ([^\s]+)')
+    rx_pam_auth = re.compile(r'error: PAM: Authentication failure for ([^\s]+) from ([^\s]+)')
+    rx_invalid_user = re.compile(r'Invalid user ([^\s]+) from ([^\s]+)')
+    rx_not_allowed = re.compile(r'User ([^\s]+) from ([^\s]+) not allowed')
+    
+    # regexes where (ip, user) are captured in order
+    rx_pam_fail = re.compile(r'(?:authentication failure|authentication failures);.*?\brhost=([^\s]+)\s+user=([^\s]+)')
+
+    ip_users = {}
+
+    try:
+        with open(filepath, 'r', errors='ignore') as f:
+            for line in f:
+                user = None
+                ip = None
+                
+                m = rx_failed_auth.search(line)
+                if m:
+                    user, ip = m.groups()
+                else:
+                    m = rx_pam_auth.search(line)
+                    if m:
+                        user, ip = m.groups()
+                    else:
+                        m = rx_invalid_user.search(line)
+                        if m:
+                            user, ip = m.groups()
+                        else:
+                            m = rx_not_allowed.search(line)
+                            if m:
+                                user, ip = m.groups()
+                            else:
+                                m = rx_pam_fail.search(line)
+                                if m:
+                                    ip, user = m.groups()
+                
+                if user and ip:
+                    if ip not in ip_users:
+                        ip_users[ip] = set()
+                    ip_users[ip].add(user)
+                    
+    except Exception:
+        pass
+
+    for ip, users in ip_users.items():
+        if len(users) >= 5:
+            print(f"{ip} {len(users)}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.9000 recall=0.9000 f1=0.9000 TP=9 FP=1 FN=1 returned=10 must=10
+  may_precision=0.9000 may_recall=0.9000 may_f1=0.9000 may_TP=9 may_FP=1 may_FN=1 may=10
+  retries=1
+  input_tokens=31227 output_tokens=1701
+  elapsed_seconds=337.22
+
+ID: multiline_4 | type: select | query: Find users who had successful SSH logins from two different source IP addresses within 60 seconds of each other. Assume year 2000 for timestamps. Return the username and the two IP addresses.
+  requested output format=username,first_ip,second_ip
+  requested output data type=string,string,string
+  command: import sys
+import re
+import gzip
+from datetime import datetime
+
+logins = {}
+
+months = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12
+}
+
+p_acc = re.compile(r'sshd[^:]*:\s+Accepted\s+\S+\s+for\s+(\S+)\s+from\s+(\S+)\s+port')
+p_pam = re.compile(r'sshd[^:]*:(?:\s+[^:]+:)?\s+authentication success;(.*)')
+p_ts = re.compile(r'^([A-Za-z.]{3,5}|\d+月)\s+(\d+)\s+(\d{2}):(\d{2}):(\d{2})')
+p_ts_iso = re.compile(r'^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})')
+
+open_func = gzip.open if sys.argv[1].endswith('.gz') else open
+with open_func(sys.argv[1], 'rt', encoding='utf-8', errors='ignore') as f:
+    for line in f:
+        if 'Accepted' not in line and 'authentication success' not in line:
+            continue
+            
+        m_ts = p_ts.search(line)
+        if m_ts:
+            mon_str, day_str, h_str, m_str, s_str = m_ts.groups()
+            if mon_str.endswith('月'):
+                mon = int(mon_str[:-1])
+            else:
+                mon = months.get(mon_str.lower().replace('.', ''), 1)
+            day, h, m_time, s = int(day_str), int(h_str), int(m_str), int(s_str)
+        else:
+            m_ts_iso = p_ts_iso.search(line)
+            if m_ts_iso:
+                y, mon_str, day_str, h_str, m_str, s_str = m_ts_iso.groups()
+                mon, day, h, m_time, s = int(mon_str), int(day_str), int(h_str), int(m_str), int(s_str)
+            else:
+                continue
+        
+        try:
+            dt = datetime(2000, mon, day, h, m_time, s)
+            ts = int(dt.timestamp())
+        except ValueError:
+            continue
+
+        ip = None
+        user = None
+
+        m_acc = p_acc.search(line)
+        if m_acc:
+            user = m_acc.group(1)
+            ip = m_acc.group(2)
+        else:
+            m_pam = p_pam.search(line)
+            if m_pam:
+                remainder = m_pam.group(1)
+                m_rhost = re.search(r'\brhost=([^ \t\n=]+)', remainder)
+                m_user = re.search(r'\buser=([^ \t\n=]+)', remainder)
+                if m_rhost and m_user:
+                    ip = m_rhost.group(1)
+                    user = m_user.group(1)
+        
+        if user and ip:
+            if user not in logins:
+                logins[user] = []
+            logins[user].append((ts, ip))
+
+printed = set()
+for user, records in logins.items():
+    records.sort(key=lambda x: x[0])
+    for i in range(len(records)):
+        for j in range(i + 1, len(records)):
+            ts1, ip1 = records[i]
+            ts2, ip2 = records[j]
+            if ts2 - ts1 <= 60:
+                if ip1 != ip2:
+                    out = f"{user} {ip1} {ip2}"
+                    if out not in printed:
+                        print(out)
+                        printed.add(out)
+            else:
+                break
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=18 FP=0 FN=0 returned=18 must=18
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=18 may_FP=0 may_FN=0 may=18
+  retries=0
+  input_tokens=15603 output_tokens=1091
+  elapsed_seconds=247.48
+
+ID: multiline_5 | type: select | query: For each host, count SSH session opens and session closes, and compute the number of unclosed sessions (opens minus closes).
+  requested output format=host,session_opens,session_closes,unclosed_sessions
+  requested output data type=string,integer,integer,integer
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    log_file = sys.argv[1]
+    stats = {}
+    
+    # Matches the timestamp (HH:MM:SS), followed by whitespace, the host, whitespace, and sshd
+    pattern = re.compile(r'^.*?\b\d{2}:\d{2}:\d{2}\S*\s+(\S+)\s+sshd')
+    
+    opener = gzip.open if log_file.endswith('.gz') else open
+    
+    try:
+        with opener(log_file, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                is_open = "session opened for user " in line
+                is_close = "session closed for user " in line
+                
+                if is_open or is_close:
+                    match = pattern.search(line)
+                    if match:
+                        host = match.group(1)
+                        if host not in stats:
+                            stats[host] = {'opens': 0, 'closes': 0}
+                        
+                        if is_open:
+                            stats[host]['opens'] += 1
+                        if is_close:
+                            stats[host]['closes'] += 1
+    except Exception:
+        pass
+
+    for host, data in stats.items():
+        opens = data['opens']
+        closes = data['closes']
+        unclosed = opens - closes
+        print(f"{host} {opens} {closes} {unclosed}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=123 FP=0 FN=0 returned=123 must=123
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=123 may_FP=0 may_FN=0 may=123
+  retries=0
+  input_tokens=15601 output_tokens=429
+  elapsed_seconds=60.57
+
+ID: multiline_6 | type: select | query: For each source IP, count the number of failed SSH authentication events that specifically targeted the root account. Exclude connection-level events where no authentication was attempted.
+  requested output format=source_ip,root_failure_count
+  requested output data type=string,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def filter_logs():
+    if len(sys.argv) < 2:
+        return
+
+    ip_counts = defaultdict(int)
+
+    # Matches PAM logs: "authentication failure;" or "failures;"
+    p1_base = re.compile(r'authentication failure[s]?;')
+    p1_ip = re.compile(r'\brhost=(?P<ip>\S+)')
+    p1_user = re.compile(r'\buser=root\b')
+
+    # Matches sshd Failed auth format
+    p2 = re.compile(r'Failed \S+ for (?:invalid user )?root\b from (?P<ip>\S+)')
+    
+    # Matches sshd PAM error format
+    p3 = re.compile(r'error: PAM: Authentication failure for root\b from (?P<ip>\S+)')
+
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                m2 = p2.search(line)
+                if m2:
+                    ip_counts[m2.group('ip')] += 1
+                    continue
+                
+                m3 = p3.search(line)
+                if m3:
+                    ip_counts[m3.group('ip')] += 1
+                    continue
+                
+                if p1_base.search(line) and p1_user.search(line):
+                    m1 = p1_ip.search(line)
+                    if m1:
+                        ip_counts[m1.group('ip')] += 1
+                    continue
+
+    except Exception:
+        pass
+
+    for ip, count in ip_counts.items():
+        print(f"{ip} {count}")
+
+if __name__ == '__main__':
+    filter_logs()
+  precision=0.9574 recall=1.0000 f1=0.9783 TP=45 FP=2 FN=0 returned=47 must=45
+  may_precision=0.9574 may_recall=1.0000 may_f1=0.9783 may_TP=45 may_FP=2 may_FN=0 may=45
+  retries=0
+  input_tokens=15590 output_tokens=486
+  elapsed_seconds=86.39
+
+ID: multiline_7 | type: select | query: For each host and username with successful SSH logins, count the total logins and the number of distinct key fingerprints used. Only count 'Accepted' login events, not session events.
+  requested output format=host,username,login_count,distinct_key_count
+  requested output data type=string,string,integer,integer
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    log_path = sys.argv[1]
+    
+    # Regex to match the host, username, and the rest of the 'Accepted' line
+    pattern = re.compile(r'^(?:.*?\s+)([^\s]+)\s+sshd[^:]*:\s+Accepted\s+\S+\s+for\s+(.+?)\s+from\s+(.*)$')
+    # Regex to match the SSH fingerprint at the end of the matched tail (e.g., "ssh2: RSA 57:c4..." or "ssh2: SHA256:...")
+    fp_pattern = re.compile(r'ssh2:\s+(?:[A-Za-z0-9-._]+\s+)?([A-Za-z0-9+/=:]+)\s*$')
+    
+    stats = {}
+    open_func = gzip.open if log_path.endswith('.gz') else open
+    
+    with open_func(log_path, 'rt', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            m = pattern.match(line.strip())
+            if m:
+                host = m.group(1)
+                user = m.group(2)
+                tail = m.group(3)
+                
+                key = (host, user)
+                if key not in stats:
+                    stats[key] = {'count': 0, 'keys': set()}
+                
+                stats[key]['count'] += 1
+                
+                fp_m = fp_pattern.search(tail)
+                if fp_m:
+                    stats[key]['keys'].add(fp_m.group(1))
+                    
+    for (host, user), data in stats.items():
+        print(f"{host} {user} {data['count']} {len(data['keys'])}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=36 FP=0 FN=0 returned=36 must=36
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=36 may_FP=0 may_FN=0 may=36
+  retries=0
+  input_tokens=15609 output_tokens=505
+  elapsed_seconds=101.5
+
+ID: multiline_8 | type: select | query: For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+  requested output format=host,distinct_attacker_ips,distinct_legitimate_ips
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+import collections
+
+def process_logs():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Robust syslog extraction for host and sshd message body
+    # Handles varying timestamp formats natively by scanning until the hostname and 'sshd'
+    log_line_re = re.compile(r'^.*?\s+(\S+)\s+sshd(?:\[\d+\]|\([^)]+\)(?:\[\d+\])?)?:\s+(.*)')
+    
+    failed_patterns = [
+        re.compile(r'authentication failure;.* rhost=([^\s]+)'),
+        re.compile(r'Failed \S+ for (?:invalid user )?\S+ from ([^\s]+)'),
+        re.compile(r'error: PAM: Authentication failure for \S+ from ([^\s]+)'),
+        re.compile(r'Invalid user \S+ from ([^\s]+)'),
+        re.compile(r'\d+ more authentication failure(?:s)?;.* rhost=([^\s]+)'),
+        re.compile(r'User \S+ from ([^\s]+) not allowed because')
+    ]
+
+    success_patterns = [
+        re.compile(r'Accepted \S+ for \S+ from ([^\s]+)'),
+        re.compile(r'authentication success;.* rhost=([^\s]+)')
+    ]
+    
+    hosts_data = collections.defaultdict(lambda: {'failed': set(), 'success': set()})
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                match = log_line_re.search(line)
+                if not match:
+                    continue
+                    
+                host = match.group(1)
+                msg = match.group(2)
+                
+                matched = False
+                for p in success_patterns:
+                    m = p.search(msg)
+                    if m:
+                        ip = m.group(1)
+                        hosts_data[host]['success'].add(ip)
+                        matched = True
+                        break
+                        
+                if not matched:
+                    for p in failed_patterns:
+                        m = p.search(msg)
+                        if m:
+                            ip = m.group(1)
+                            hosts_data[host]['failed'].add(ip)
+                            break
+                            
+    except Exception:
+        pass
+        
+    for host in sorted(hosts_data.keys()):
+        f_count = len(hosts_data[host]['failed'])
+        s_count = len(hosts_data[host]['success'])
+        print(f"{host} {f_count} {s_count}")
+
+if __name__ == '__main__':
+    process_logs()
+  precision=0.9118 recall=0.9538 f1=0.9323 TP=62 FP=6 FN=3 returned=68 must=65
+  may_precision=0.9118 may_recall=0.9538 may_f1=0.9323 may_TP=62 may_FP=6 may_FN=3 may=65
+  retries=0
+  input_tokens=15624 output_tokens=754
+  elapsed_seconds=135.37
+
+# Macro Averages (where/select queries)
+# precision=0.9261 recall=0.9508 f1=0.9378
+# may_precision=0.9261 may_recall=0.9508 may_f1=0.9378
+# retries_total=1 retries_avg=0.12
+# total_input_tokens=140496 total_output_tokens=9374
+# total_elapsed=1436.23s avg_elapsed=179.53s
+# Worst 5 queries by f1
+# 1. multiline_1 | type: select | f1=0.7543 | query: For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+# 2. multiline_3 | type: select | f1=0.9000 | query: Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.
+# 3. multiline_8 | type: select | f1=0.9323 | query: For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+# 4. multiline_2 | type: select | f1=0.9375 | query: Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.
+# 5. multiline_6 | type: select | f1=0.9783 | query: For each source IP, count the number of failed SSH authentication events that specifically targeted the root account. Exclude connection-level events where no authentication was attempted.

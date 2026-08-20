@@ -1,0 +1,419 @@
+# Evaluation report generated 20260429-150421
+# Source JSON: queries/audit_simple.json
+# Log file input: data/logs/audit
+# Log file resolved: data/logs/audit
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/audit.json
+# Queries evaluated: 12
+
+ID: audit_query_1 | type: where | query: Find audit log lines that report SELinux AVC denials.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def filter_avc_denials(log_file):
+    # Match 'avc: denied' allowing for variable whitespace as requested in guardrails
+    pattern = re.compile(r"avc:\s*denied\b", re.IGNORECASE)
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        filter_avc_denials(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=16917 FP=0 FN=0 returned=16917 must=16917
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=16917 may_FP=0 may_FN=0 may=16917
+  retries=0
+  input_tokens=127144 output_tokens=193
+  elapsed_seconds=21.26
+
+ID: audit_query_2 | type: where | query: Find audit log lines that show SELinux policy loads.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # SELinux policy loads are represented by audit type 1403 (MAC_POLICY_LOAD),
+    # string 'policy loaded', 'policyload notice', or the execution of load_policy.
+    pattern = re.compile(
+        r"\bpolicy loaded\b|"
+        r"\bpolicyload notice\b|"
+        r"\btype=MAC_POLICY_LOAD\b|"
+        r"\btype=1403\b|"
+        r"\bcomm=[\"']?load_policy\b|"
+        r"\bexe=[\"']?(?:/usr)?/sbin/load_policy\b",
+        re.IGNORECASE
+    )
+
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9386 recall=1.0000 f1=0.9683 TP=7439 FP=487 FN=0 returned=7926 must=7439
+  may_precision=0.9386 may_recall=1.0000 may_f1=0.9683 may_TP=7439 may_FP=487 may_FN=0 may=7439
+  retries=0
+  input_tokens=127144 output_tokens=339
+  elapsed_seconds=79.63
+
+ID: audit_query_3 | type: where | query: Find audit log lines that show SELinux boolean changes.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    file_path = sys.argv[1]
+    
+    # Regex to specifically identify SELinux boolean changes
+    # Matching the exact fields helps avoid false positives
+    pattern = re.compile(r'\bbool=\S+\s+val=\S+\s+old_val=\S+')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line) or ('bool=' in line and 'val=' in line and 'old_val=' in line and ('type=1405' in line or 'type=MAC_CONFIG_CHANGE' in line)):
+                    print(line, end='')
+    except IOError:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=70 FP=0 FN=0 returned=70 must=70
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=70 may_FP=0 may_FN=0 may=70
+  retries=0
+  input_tokens=127144 output_tokens=259
+  elapsed_seconds=30.24
+
+ID: audit_query_4 | type: where | query: Find audit log lines that show SELinux enforcing mode changes.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def filter_logs(filepath):
+    # Pattern matches SELinux enforcing mode changes:
+    # 1. enforcing=... old_enforcing=... (and truncated 'old_')
+    # 2. avc: received setenforce notice (enforcing=...)
+    pattern = re.compile(r'\benforcing=\d+\s+old_|\bavc:\s*received setenforce notice\s*\(enforcing=\d+\)')
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except IOError:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        filter_logs(sys.argv[1])
+  precision=0.9994 recall=1.0000 f1=0.9997 TP=7029 FP=4 FN=0 returned=7033 must=7029
+  may_precision=0.9994 may_recall=1.0000 may_f1=0.9997 may_TP=7029 may_FP=4 may_FN=0 may=7029
+  retries=0
+  input_tokens=127145 output_tokens=237
+  elapsed_seconds=45.17
+
+ID: audit_query_5 | type: where | query: Find audit log lines showing kernel audit initialization events.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    # Pattern to match kernel audit initialization events
+    # e.g., "audit(1251660174.383:1): initialized"
+    # or "audit(1646088178.779:1): state=initialized"
+    pattern = re.compile(r"audit\([^)]+\):\s*(?:state=)?initialized\b")
+    
+    try:
+        with open(sys.argv[1], 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=9535 FP=0 FN=0 returned=9535 must=9535
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=9535 may_FP=0 may_FN=0 may=9535
+  retries=0
+  input_tokens=127142 output_tokens=235
+  elapsed_seconds=38.95
+
+ID: audit_query_6 | type: where | query: Find audit log lines that record the audit daemon process ID being set or changed.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    # Matches the exact configuration parameter used when the audit daemon process ID is set or changed.
+    pattern = re.compile(r'\baudit_pid=\d+')
+    
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if pattern.search(line):
+                print(line, end='')
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=3554 FP=0 FN=0 returned=3554 must=3554
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=3554 may_FP=0 may_FN=0 may=3554
+  retries=0
+  input_tokens=127148 output_tokens=163
+  elapsed_seconds=26.63
+
+ID: audit_query_7 | type: where | query: Find audit log lines for failed SSH authentication attempts handled by sshd.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def filter_logs(file_path):
+    # Match 'res=failed' with or without quotes around 'failed'
+    failed_regex = re.compile(r'\bres=["\']?failed\b', re.IGNORECASE)
+    
+    # Match sshd indicators in exe, comm, terminal, or selinux subj
+    sshd_regex = re.compile(r'(?:exe=["\']?(?:/[^"\'\s]*/)?sshd["\']?|comm=["\']?sshd["\']?|terminal=["\']?sshd?["\']?|subj=[^\s]*sshd_t[^\s]*)', re.IGNORECASE)
+    
+    # Match authentication/login events
+    auth_regex = re.compile(
+        r'\btype=["\']?(?:USER_AUTH|USER_LOGIN|1100|1112)\b'
+        r'|PAM:\s?authentication'
+        r'|\bop=["\']?(?:login|pubkey|pubkey_auth|password|password_auth|PAM:authentication)\b',
+        re.IGNORECASE
+    )
+
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if failed_regex.search(line) and sshd_regex.search(line) and auth_regex.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        filter_logs(sys.argv[1])
+  precision=1.0000 recall=0.9975 f1=0.9987 TP=1186 FP=0 FN=3 returned=1186 must=1189
+  may_precision=1.0000 may_recall=0.9975 may_f1=0.9987 may_TP=1186 may_FP=0 may_FN=3 may=1189
+  retries=0
+  input_tokens=127146 output_tokens=435
+  elapsed_seconds=139.55
+
+ID: audit_query_8 | type: where | query: Find audit log lines for PAM session open events.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_file = sys.argv[1]
+    pattern = re.compile(r'\bPAM:\s*session(?:_|\s+)open\b', re.IGNORECASE)
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2579 FP=0 FN=0 returned=2579 must=2579
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2579 may_FP=0 may_FN=0 may=2579
+  retries=0
+  input_tokens=127142 output_tokens=168
+  elapsed_seconds=33.94
+
+ID: audit_query_9 | type: where | query: Find audit log lines for systemd unit start events that name a service unit.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    type_pattern = re.compile(r'\btype=(1130|SERVICE_START)\b')
+    unit_pattern = re.compile(r'\bunit=')
+    
+    with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if type_pattern.search(line) and unit_pattern.search(line):
+                print(line, end='')
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2717 FP=0 FN=0 returned=2717 must=2717
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2717 may_FP=0 may_FN=0 may=2717
+  retries=1
+  input_tokens=254329 output_tokens=504
+  elapsed_seconds=119.15
+
+ID: audit_select_1 | type: select | query: Find the hosts that logged SELinux AVC denials.
+  requested output format=host
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    log_file = sys.argv[1]
+    hosts = set()
+    
+    syslog_re = re.compile(
+        r'^(?:[a-zA-Z0-9_./-]+:)?'
+        r'(?:'
+        r'(?:\d+\s+)?[^\s\d]+\s+\d+\s+\d{2}:\d{2}:\d{2}'
+        r'|'
+        r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?'
+        r'|'
+        r'\d{1,2}:\d{2}:\d{2}(?:\s+[APM]{2})?'
+        r')\s+([A-Za-z0-9_.-]+)\s+'
+    )
+    
+    node_re = re.compile(r'\bnode=([A-Za-z0-9_.-]+)')
+    
+    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if 'avc:' in line and 'denied' in line:
+                m_node = node_re.search(line)
+                if m_node:
+                    hosts.add(m_node.group(1))
+                    continue
+                
+                m_sys = syslog_re.match(line)
+                if m_sys:
+                    host = m_sys.group(1)
+                    lower_host = host.lower()
+                    if lower_host not in ('kernel', 'kernel:', 'audit', 'audit:', 'type=1400', 'type=avc', 'am', 'pm', 'varlogmessages:', 'varlogmessages'):
+                        if not host.startswith('['):
+                            hosts.add(host)
+
+    for host in sorted(hosts):
+        print(host)
+
+if __name__ == '__main__':
+    main()
+  precision=0.9828 recall=0.9856 f1=0.9842 TP=342 FP=6 FN=5 returned=348 must=347
+  may_precision=0.9828 may_recall=0.9856 may_f1=0.9842 may_TP=342 may_FP=6 may_FN=5 may=347
+  retries=0
+  input_tokens=127309 output_tokens=552
+  elapsed_seconds=105.78
+
+ID: audit_select_2 | type: select | query: Find the SELinux boolean names that were changed.
+  requested output format=boolean_name
+  requested output data type=string
+  command: import sys
+import re
+
+def extract_booleans():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Regex to capture the SELinux boolean name from 'bool=...'
+    bool_pattern = re.compile(r'\bbool=([^ \n]+)')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if 'bool=' in line:
+                    match = bool_pattern.search(line)
+                    if match:
+                        print(match.group(1))
+    except IOError:
+        pass
+
+if __name__ == '__main__':
+    extract_booleans()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=17 FP=0 FN=0 returned=17 must=17
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=17 may_FP=0 may_FN=0 may=17
+  retries=0
+  input_tokens=127313 output_tokens=205
+  elapsed_seconds=24.01
+
+ID: audit_select_3 | type: select | query: Find the service unit names reported in systemd unit start events.
+  requested output format=service_unit
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    # Match systemd unit start events: type=1130 or type=SERVICE_START
+    type_re = re.compile(r'\btype=(?:1130|SERVICE_START)\b')
+    # Match unit="..." or unit='...' or unit=...
+    unit_re = re.compile(r'\bunit=(?:"([^"]+)"|\'([^\']+)\'|([^\s\'"]+))')
+    # Fallback to match comm="..." or comm='...' or comm=...
+    comm_re = re.compile(r'\bcomm=(?:"([^"]+)"|\'([^\']+)\'|([^\s\'"]+))')
+
+    with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if type_re.search(line):
+                m_unit = unit_re.search(line)
+                if m_unit:
+                    print(m_unit.group(1) or m_unit.group(2) or m_unit.group(3))
+                else:
+                    # In older systemd versions, the unit name was populated in the 'comm' field
+                    m_comm = comm_re.search(line)
+                    if m_comm:
+                        print(m_comm.group(1) or m_comm.group(2) or m_comm.group(3))
+
+if __name__ == '__main__':
+    main()
+  precision=0.7579 recall=1.0000 f1=0.8623 TP=216 FP=69 FN=0 returned=285 must=216
+  may_precision=0.7579 may_recall=1.0000 may_f1=0.8623 may_TP=216 may_FP=69 may_FN=0 may=216
+  retries=1
+  input_tokens=254663 output_tokens=784
+  elapsed_seconds=126.58
+
+# Macro Averages (where/select queries)
+# precision=0.9732 recall=0.9986 f1=0.9844
+# may_precision=0.9732 may_recall=0.9986 may_f1=0.9844
+# retries_total=2 retries_avg=0.17
+# total_input_tokens=1780769 total_output_tokens=4074
+# total_elapsed=790.89s avg_elapsed=65.91s
+# Worst 5 queries by f1
+# 1. audit_select_3 | type: select | f1=0.8623 | query: Find the service unit names reported in systemd unit start events.
+# 2. audit_query_2 | type: where | f1=0.9683 | query: Find audit log lines that show SELinux policy loads.
+# 3. audit_select_1 | type: select | f1=0.9842 | query: Find the hosts that logged SELinux AVC denials.
+# 4. audit_query_7 | type: where | f1=0.9987 | query: Find audit log lines for failed SSH authentication attempts handled by sshd.
+# 5. audit_query_4 | type: where | f1=0.9997 | query: Find audit log lines that show SELinux enforcing mode changes.

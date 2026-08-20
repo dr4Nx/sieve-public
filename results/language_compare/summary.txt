@@ -1,0 +1,14 @@
+# Language comparison macro F1 — matches Table 'Bash vs Python'.
+
+Dataset       Bash     Python 
+--------------------------------
+Cron (S)      0.915    0.998  
+Cron (C)      0.993    0.991  
+SSH (S)       0.987    0.987  
+SSH (C)       0.904    0.938  
+Audit (S)     0.989    0.989  
+Audit (C)     0.574    0.929  
+DHCP (S)      0.978    0.960  
+DHCP (C)      0.446    0.815  
+Puppet (S)    0.998    0.998  
+Puppet (C)    0.773    0.861  

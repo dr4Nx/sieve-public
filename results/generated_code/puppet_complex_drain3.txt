@@ -1,0 +1,433 @@
+# Evaluation report generated 20260429-135038
+# Source JSON: queries/puppet_complex.json
+# Log file input: data/logs/puppet
+# Log file resolved: data/logs/puppet
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/puppet_templates_20260429-135045.json
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.
+  requested output format=host,started_run_stream_count,finished_run_stream_count,completion_rate
+  requested output data type=string,integer,integer,float
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    filepath = sys.argv[1]
+    
+    # Matches syslog format: Month Day Time host process[pid]: message
+    log_re = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(?P<host>\S+)\s+(?P<process>[a-zA-Z0-9_.-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)')
+    
+    start_re = re.compile(r'^Applying configuration version')
+    finish_re = re.compile(r'^(Finished catalog run in|Applied catalog in)')
+    
+    stats = {}
+    active = {}
+    
+    opener = gzip.open if filepath.endswith('.gz') else open
+    with opener(filepath, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            m = log_re.match(line)
+            if not m:
+                continue
+                
+            host = m.group('host')
+            pid = m.group('pid')
+            msg = m.group('message')
+            
+            if start_re.match(msg):
+                if host not in stats:
+                    stats[host] = {'starts': 0, 'finishes': 0}
+                stats[host]['starts'] += 1
+                
+                # Use PID if available to track transaction uniquely per host
+                ident = (host, pid) if pid else host
+                active[ident] = True
+                
+            elif finish_re.match(msg):
+                ident = (host, pid) if pid else host
+                # Only count finish if we saw the start of this specific run
+                if active.get(ident):
+                    stats[host]['finishes'] += 1
+                    active[ident] = False
+
+    for host, host_stats in stats.items():
+        starts = host_stats['starts']
+        finishes = host_stats['finishes']
+        rate = float(finishes) / starts if starts > 0 else 0.0
+        print(f"{host} {starts} {finishes} {rate}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.8000 recall=0.8000 f1=0.8000 TP=20 FP=5 FN=5 returned=25 must=25
+  may_precision=0.8000 may_recall=0.8000 may_f1=0.8000 may_TP=20 may_FP=5 may_FN=5 may=25
+  retries=0
+  input_tokens=213891 output_tokens=608
+  elapsed_seconds=66.31
+
+ID: multiline_2 | type: select | query: For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds, rounded to two decimal places.
+  requested output format=host,average_runtime_seconds
+  requested output data type=string,float
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_file = sys.argv[1]
+    host_runtimes = defaultdict(list)
+    
+    # Matches syslog format to extract host and runtime for finished catalog runs.
+    # Covers both "Finished catalog run in X seconds" and "Applied catalog in X seconds" log variations.
+    regex = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+[^:]+:\s+(?:Finished catalog run|Applied catalog) in ([\d\.]+) seconds')
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m = regex.search(line)
+                if m:
+                    host = m.group(1)
+                    runtime = float(m.group(2))
+                    host_runtimes[host].append(runtime)
+                    
+        for host, runtimes in host_runtimes.items():
+            if runtimes:
+                avg = sum(runtimes) / len(runtimes)
+                print(f"{host} {avg:.2f}")
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.8367 recall=0.8723 f1=0.8542 TP=41 FP=8 FN=6 returned=49 must=47
+  may_precision=0.8367 may_recall=0.8723 may_f1=0.8542 may_TP=41 may_FP=8 may_FN=6 may=47
+  retries=0
+  input_tokens=213900 output_tokens=375
+  elapsed_seconds=30.34
+
+ID: multiline_3 | type: select | query: Find Puppet agent processes where a node-definition fetch failure is later followed by use of a cached catalog. Return the host, process id, and the original syslog timestamp text from those two events.
+  requested output format=host,process_id,failure_timestamp,cached_catalog_timestamp
+  requested output data type=string,integer,string,string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    log_file = sys.argv[1]
+    
+    # Matches standard syslog format:
+    # e.g., "Mar 10 00:36:44 puma25 puppet-agent[23616]: ..."
+    log_pattern = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+^[^\[:]+\[(\d+)\]:\s+(.*)$')
+    # Wait, the caret ^ inside was a typo in my thought process, let's fix it:
+    log_pattern = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+[^\[:]+\[(\d+)\]:\s+(.*)$')
+    
+    failures = {}
+    
+    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            m = log_pattern.match(line)
+            if not m:
+                continue
+                
+            ts, host, pid, msg = m.groups()
+            
+            if "Unable to fetch my node definition" in msg:
+                # Record the timestamp of the node definition fetch failure
+                failures[(host, pid)] = ts
+            elif "Using cached catalog" in msg:
+                # If a failure was previously recorded for this host and process, emit the match
+                if (host, pid) in failures:
+                    failure_ts = failures.pop((host, pid))
+                    print(f"{host} {pid} {failure_ts} {ts}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=43 FP=0 FN=0 returned=43 must=43
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=43 may_FP=0 may_FN=0 may=43
+  retries=0
+  input_tokens=213917 output_tokens=488
+  elapsed_seconds=51.8
+
+ID: multiline_4 | type: select | query: For each host that saw report-send failures or remote catalog retrieval failures, count both and return those two totals.
+  requested output format=host,report_failure_count,catalog_retrieval_failure_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Dictionary to keep track of counts per host
+    # values are lists: [report_failure_count, catalog_retrieval_failure_count]
+    stats = defaultdict(lambda: [0, 0])
+    
+    # Regex to match standard syslog format:
+    # Month Day Time Hostname Process[PID]: Message
+    log_regex = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+[^:]+:\s+(.*)')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m = log_regex.match(line)
+                if m:
+                    host = m.group(1)
+                    msg = m.group(2)
+                    
+                    is_report_fail = msg.startswith("Could not send report:")
+                    is_catalog_fail = msg.startswith("Could not retrieve catalog from remote server:")
+                    
+                    if is_report_fail:
+                        stats[host][0] += 1
+                    if is_catalog_fail:
+                        stats[host][1] += 1
+                        
+    except IOError:
+        pass
+        
+    # Output results
+    for host, counts in stats.items():
+        rep_fail = counts[0]
+        cat_fail = counts[1]
+        
+        if rep_fail > 0 or cat_fail > 0:
+            print(f"{host} {rep_fail} {cat_fail}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=19 FP=0 FN=0 returned=19 must=19
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=19 may_FP=0 may_FN=0 may=19
+  retries=0
+  input_tokens=213873 output_tokens=484
+  elapsed_seconds=30.0
+
+ID: multiline_5 | type: select | query: For each Puppet module name appearing after '/Stage[main]/' in skipped resource identifiers, count how many resources were skipped because of failed dependencies.
+  requested output format=module_name,skipped_dependency_count
+  requested output data type=string,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+
+    log_file = sys.argv[1]
+    counts = defaultdict(int)
+    
+    # Regex to extract the module name directly after /Stage[main]/ 
+    # and ensure the line logs a skipped resource due to failed dependencies.
+    pattern = re.compile(r'\(/Stage\[main\]/([^/\]]+).*?\)\s+Skipping because of failed dependencies')
+
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    module_name = match.group(1)
+                    counts[module_name] += 1
+    except Exception as e:
+        sys.exit(1)
+
+    # Output the required fields separated by a single space
+    for module_name, count in counts.items():
+        print(f"{module_name} {count}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=151 FP=0 FN=0 returned=151 must=151
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=151 may_FP=0 may_FN=0 may=151
+  retries=0
+  input_tokens=213859 output_tokens=298
+  elapsed_seconds=49.3
+
+ID: multiline_6 | type: select | query: For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.
+  requested output format=host,error_family,occurrence_count
+  requested output data type=string,string,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def process_logs(file_path):
+    # Regex to match syslog-style date, host, and the puppet process
+    log_re = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+puppet(?:-agent)?(?:\[\d+\])?:\s+(.*)$')
+    
+    counts = defaultdict(int)
+    
+    # Pre-compile regexes for each error family for faster matching
+    error_patterns = {
+        'certificate_verify_failed': re.compile(r'certificate verify failed', re.IGNORECASE),
+        'getaddrinfo': re.compile(r'getaddrinfo', re.IGNORECASE),
+        'network_unreachable': re.compile(r'network is unreachable|no route to host', re.IGNORECASE),
+        'command_not_found': re.compile(r'command not found', re.IGNORECASE),
+        'timeout': re.compile(r'exceeded timeout|timeout on|timed out|execution expired', re.IGNORECASE),
+        'error_downloading_packages': re.compile(r'error downloading packages', re.IGNORECASE),
+        'no_child_processes': re.compile(r'no child processes', re.IGNORECASE)
+    }
+
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = log_re.match(line)
+                if match:
+                    host = match.group(1)
+                    message = match.group(2)
+                    
+                    for family, pattern in error_patterns.items():
+                        if pattern.search(message):
+                            counts[(host, family)] += 1
+    except Exception:
+        pass
+
+    # Output the aggregated counts
+    for (host, family) in sorted(counts.keys()):
+        print(f"{host} {family} {counts[(host, family)]}")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=0.5625 recall=0.9474 f1=0.7059 TP=18 FP=14 FN=1 returned=32 must=19
+  may_precision=0.5625 may_recall=0.9474 may_f1=0.7059 may_TP=18 may_FP=14 may_FN=1 may=19
+  retries=0
+  input_tokens=213900 output_tokens=559
+  elapsed_seconds=63.49
+
+ID: multiline_7 | type: select | query: For each host and Puppet agent process that logged refresh activity, count how many refreshes were scheduled and how many refreshes were triggered.
+  requested output format=host,process_id,scheduled_refresh_count,triggered_refresh_count
+  requested output data type=string,integer,integer,integer
+  command: import sys
+import re
+import gzip
+import argparse
+from collections import defaultdict
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('logfile', help='path to the log file')
+    args = parser.parse_args()
+    
+    file_path = args.logfile
+    opener = gzip.open if file_path.endswith('.gz') else open
+        
+    # Dictionary to hold (host, process_id) -> [scheduled_count, triggered_count]
+    stats = defaultdict(lambda: [0, 0])
+    
+    # Matches typical syslog structure: Mon Day HH:MM:SS host process[PID]: message
+    # We strictly enforce the presence of a process ID inside brackets as required.
+    line_re = re.compile(r"^\w{3}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(?P<host>\S+)\s+puppet(?:-agent)?\[(?P<pid>\d+)\]:\s+(?P<message>.*)")
+    
+    with opener(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            m = line_re.match(line)
+            if not m:
+                continue
+            
+            message = m.group('message')
+            
+            # Fast substring checks for the exact phrases denoting scheduled and triggered refreshes
+            sched = "Scheduling refresh of" in message
+            trig = "Triggered 'refresh' from" in message
+            
+            if sched or trig:
+                host = m.group('host')
+                pid = int(m.group('pid'))
+                
+                if sched:
+                    stats[(host, pid)][0] += 1
+                if trig:
+                    stats[(host, pid)][1] += 1
+                    
+    # Output fields: host, process_id, scheduled_refresh_count, triggered_refresh_count
+    for (host, pid), (s_cnt, t_cnt) in stats.items():
+        print(f"{host} {pid} {s_cnt} {t_cnt}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=204 FP=0 FN=0 returned=204 must=204
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=204 may_FP=0 may_FN=0 may=204
+  retries=0
+  input_tokens=213881 output_tokens=562
+  elapsed_seconds=52.89
+
+ID: multiline_8 | type: select | query: Find Puppet agent processes where a remote catalog retrieval failure is followed by use of a cached catalog and then a report-send failure. Return the host, process id, and the original syslog timestamp text from those three events.
+  requested output format=host,process_id,catalog_failure_timestamp,cached_catalog_timestamp,report_failure_timestamp
+  requested output data type=string,integer,string,string,string
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_file = sys.argv[1]
+    pattern = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\S*)\s+(\S+)\s+[^:\[]*?puppet[^:\[]*?\[(\d+)\]:\s+(.*)$')
+    
+    state = {}
+    
+    try:
+        if log_file.endswith('.gz'):
+            opener = gzip.open(log_file, 'rt', encoding='utf-8', errors='ignore')
+        else:
+            opener = open(log_file, 'r', encoding='utf-8', errors='ignore')
+            
+        with opener as f:
+            for line in f:
+                match = pattern.match(line)
+                if not match:
+                    continue
+                    
+                ts, host, pid_str, msg = match.groups()
+                try:
+                    pid = int(pid_str)
+                except ValueError:
+                    continue
+                    
+                key = (host, pid)
+                
+                if msg.startswith('Could not retrieve catalog from remote server'):
+                    state[key] = {'ts1': ts}
+                elif msg.startswith('Using cached catalog'):
+                    if key in state and 'ts1' in state[key]:
+                        state[key]['ts2'] = ts
+                elif msg.startswith('Could not send report'):
+                    if key in state and 'ts2' in state[key]:
+                        print(f'{host} {pid} {state[key]["ts1"]} {state[key]["ts2"]} {ts}')
+                        del state[key]
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=28 FP=0 FN=0 returned=28 must=28
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=28 may_FP=0 may_FN=0 may=28
+  retries=1
+  input_tokens=427917 output_tokens=989
+  elapsed_seconds=126.98
+
+# Macro Averages (where/select queries)
+# precision=0.8999 recall=0.9525 f1=0.9200
+# may_precision=0.8999 may_recall=0.9525 may_f1=0.9200
+# retries_total=1 retries_avg=0.12
+# total_input_tokens=1925138 total_output_tokens=4363
+# total_elapsed=471.11s avg_elapsed=58.89s
+# Worst 5 queries by f1
+# 1. multiline_6 | type: select | f1=0.7059 | query: For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.
+# 2. multiline_1 | type: select | f1=0.8000 | query: For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.
+# 3. multiline_2 | type: select | f1=0.8542 | query: For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds, rounded to two decimal places.
+# 4. multiline_3 | type: select | f1=1.0000 | query: Find Puppet agent processes where a node-definition fetch failure is later followed by use of a cached catalog. Return the host, process id, and the original syslog timestamp text from those two events.
+# 5. multiline_4 | type: select | f1=1.0000 | query: For each host that saw report-send failures or remote catalog retrieval failures, count both and return those two totals.

@@ -1,0 +1,91 @@
+# Human baseline report for dhcp_complex
+# Baseline scripts: human_baselines/dhcp_complex
+# Log file: data/logs/dhcp
+# Queries evaluated: 21
+
+ID: multiline_1 | type: select | query: Find transactions where time from DHCPREQUEST to DHCPACK exceeds 5 seconds. Return a list of pairs of transaction ids and duration.
+  script: human_baselines/dhcp_complex/multiline_1.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=3415 FN=163 returned=3415 must=163
+
+ID: multiline_2 | type: select | query: Find hosts issuing >100 DHCPREQUESTs within any 30-minute rolling window. Report the times of the first and last REQUEST of the first such window with the largest number of requests for each host.
+  script: human_baselines/dhcp_complex/multiline_2.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=78 FN=30 returned=78 must=30
+
+ID: multiline_3 | type: select | query: Identify transaction_ids where a second DHCPREQUEST occurs before the DHCPACK for the first.
+  script: human_baselines/dhcp_complex/multiline_3.py
+  precision=1.0000 recall=0.8603 f1=0.9249 TP=505 FP=0 FN=82 returned=505 must=587
+
+ID: multiline_4 | type: select | query: For each client that sent at least one DHCPDISCOVER with an explicit transaction ID, count how many transaction IDs begin with DHCPDISCOVER, how many of those later contain DHCPACK, and the resulting completion rate.
+  script: human_baselines/dhcp_complex/multiline_4.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=196 FP=0 FN=0 returned=196 must=196
+
+ID: multiline_5 | type: select | query: Considering only client/process streams that contain DHCPDISCOVER, DHCPOFFER, DHCPREQUEST, and DHCPACK, return for each client the average elapsed seconds between the DISCOVER and ACK.
+  script: human_baselines/dhcp_complex/multiline_5.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=617 FN=585 returned=617 must=585
+
+ID: multiline_6 | type: select | query: For each DHCP server IP address, count the total number of OFFER messages sent. Then count how many of those OFFER messages resulted in a corresponding ACK within 60 seconds for the same transaction. Compute the conversion rate.
+  script: human_baselines/dhcp_complex/multiline_6.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=541 returned=0 must=541
+
+ID: multiline_7 | type: select | query: For each client, count transaction IDs that contain a DISCOVER and do not contain an ACK within 120 seconds. Only use transactions with an explicit transaction ID, return only clients with a nonzero count, and sort the results in descending order.
+  script: human_baselines/dhcp_complex/multiline_7.py
+  precision=0.9762 recall=0.9762 f1=0.9762 TP=41 FP=1 FN=1 returned=42 must=42
+
+ID: multiline_8 | type: select | query: For each client and network interface, count the total number of DISCOVER and REQUEST messages observed. Output one row per client and interface.
+  script: human_baselines/dhcp_complex/multiline_8.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=1533 FN=1533 returned=1533 must=1533
+
+ID: multiline_9 | type: select | query: For each client, calculate the average number of DHCP messages logged per transaction ID. Only count DHCP messages that specify a transaction ID. 
+  script: human_baselines/dhcp_complex/multiline_9.py
+  precision=0.9971 recall=0.9971 f1=0.9971 TP=341 FP=1 FN=1 returned=342 must=342
+
+ID: multiline_10 | type: select | query: For each hour 0 through 23, count unique transaction IDs whose DISCOVER occurred in that hour. Then count how many of those same transaction IDs have an ACK anywhere in the log. Use only explicit transaction IDs and return all 24 hours with the completion rate for each hour.
+  script: human_baselines/dhcp_complex/multiline_10.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=24 FP=0 FN=0 returned=24 must=24
+
+ID: multiline_11 | type: select | query: Return the 1-indexed line number and hostname for each DHCPOFFER line where no DHCPDISCOVER from the same hostname/process stream occurred in the previous 30 seconds. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream.
+  script: human_baselines/dhcp_complex/multiline_11.py
+  precision=0.0002 recall=1.0000 f1=0.0004 TP=2 FP=9229 FN=0 returned=9231 must=2
+
+ID: multiline_12 | type: select | query: Identify ACK messages where no matching REQUEST from the same transaction occurred within the previous 30 seconds.
+  script: human_baselines/dhcp_complex/multiline_12.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=0 FP=0 FN=0 returned=0 must=0
+
+ID: multiline_13 | type: select | query: Identify invalid DHCP cycle transitions by hostname and transaction ID. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream. Valid repeated cycles are DHCPDISCOVER -> DHCPOFFER -> DHCPREQUEST -> DHCPACK and DHCPREQUEST -> DHCPACK. Treat incomplete trailing sequences as allowed; only explicit bad transitions are violations.
+  script: human_baselines/dhcp_complex/multiline_13.py
+  precision=0.9821 recall=0.9355 f1=0.9582 TP=5472 FP=100 FN=377 returned=5572 must=5849
+
+ID: multiline_14 | type: select | query: Identify transactions where two or more REQUEST messages occur before the first ACK.
+  script: human_baselines/dhcp_complex/multiline_14.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=505 FP=0 FN=0 returned=505 must=505
+
+ID: multiline_15 | type: select | query: For completed transactions, calculate the time difference in seconds between the REQUEST and the ACK. List transactions where this latency exceeds 5 seconds.
+  script: human_baselines/dhcp_complex/multiline_15.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=3415 FN=163 returned=3415 must=163
+
+ID: multiline_16 | type: select | query: Identify transactions (same client and transaction ID) where two or more DISCOVER messages occur within 60 seconds and no OFFER is present.
+  script: human_baselines/dhcp_complex/multiline_16.py
+  precision=0.9677 recall=1.0000 f1=0.9836 TP=4280 FP=143 FN=0 returned=4423 must=4280
+
+ID: multiline_17 | type: select | query: Identify DHCP exchanges where the client received at least two OFFERs from different servers before getting an ACK. Return the client hostname, process id, transaction id, timestamp of the event, list of server ips, and ACKed server for each instance.
+  script: human_baselines/dhcp_complex/multiline_17.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=0 FP=0 FN=0 returned=0 must=0
+
+ID: multiline_18 | type: select | query: Are there any cases where two different clients were assigned the same IP address at exactly the same timestamp?
+  script: human_baselines/dhcp_complex/multiline_18.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=14 FN=0 returned=14 must=0
+
+ID: multiline_19 | type: select | query: Are there any transactions (same client and transaction ID) where DISCOVER, OFFER, REQUEST, and ACK all occurred at exactly the same timestamp?
+  script: human_baselines/dhcp_complex/multiline_19.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=743 returned=0 must=743
+
+ID: multiline_20 | type: select | query: Associate each assigned IP with the MAC address reported for that client/process stream, and return the timestamp, client MAC, and assigned IP.
+  script: human_baselines/dhcp_complex/multiline_20.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=14605 returned=0 must=14605
+
+ID: multiline_21 | type: select | query: Find DHCP renewals where a DHCPREQUEST occurs within 25% of the stated renewal time after the lease was bound in the same host/process stream. Return the hostname, assigned IP, and elapsed seconds from the bound event to the REQUEST.
+  script: human_baselines/dhcp_complex/multiline_21.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=2302 FN=4356 returned=2302 must=4356
+
+# Macro Averages
+# precision=0.4725 recall=0.5128 f1=0.4686

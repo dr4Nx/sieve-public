@@ -1,0 +1,1560 @@
+{
+  "zero_shot": {
+    "summary": {
+      "cron": {
+        "n_queries": 8,
+        "mean_f1": 1.0
+      },
+      "sshd": {
+        "n_queries": 8,
+        "mean_f1": 0.7801
+      },
+      "audit": {
+        "n_queries": 8,
+        "mean_f1": 0.8223
+      },
+      "puppet": {
+        "n_queries": 8,
+        "mean_f1": 0.6325
+      },
+      "dhcp": {
+        "n_queries": 21,
+        "mean_f1": 0.568
+      },
+      "overall": {
+        "n_queries": 53,
+        "mean_f1": 0.7133
+      }
+    },
+    "logs": {
+      "cron": {
+        "multiline_1": {
+          "natural_language": "For each distinct command executed by cron, count how many times it was executed and by how many distinct users.",
+          "output_format": [
+            "command",
+            "execution_count",
+            "distinct_user_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 4,
+          "n_gt": 4,
+          "translation": "def q1(eng):\n  groups = eng.group_by(_cmd_rows(eng), lambda r: r.get(\"command\"))\n  out = []\n  for cmd, rows in groups.items():\n    users = {r.get(\"system_user\") for r in rows}\n    out.append((cmd, len(rows), len(users)))\n  return out\n"
+        },
+        "multiline_2": {
+          "natural_language": "For each hour of the day (0 through 23), count the total number of cron job command executions.",
+          "output_format": [
+            "hour",
+            "execution_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 24,
+          "n_gt": 24,
+          "translation": "def q2(eng):\n  counts = defaultdict(int)\n  for r in _cmd_rows(eng):\n    if r.dt is not None:\n      counts[r.dt.hour] += 1\n  return [(h, counts.get(h, 0)) for h in range(24)]\n"
+        },
+        "multiline_3": {
+          "natural_language": "For each date, count the number of cron session opens, session closes, and command executions.",
+          "output_format": [
+            "date",
+            "session_opens",
+            "session_closes",
+            "cmd_executions"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 26,
+          "n_gt": 26,
+          "translation": "def q3(eng):\n  opens = defaultdict(int)\n  closes = defaultdict(int)\n  cmds = defaultdict(int)\n  for r in eng.rows:\n    d = _date(r)\n    if d is None:\n      continue\n    a = r.get(\"action\")\n    if a == \"opened\":\n      opens[d] += 1\n    elif a == \"closed\":\n      closes[d] += 1\n    if r.get(\"command\") is not None:\n      cmds[d] += 1\n  dates = set(opens) | set(closes) | set(cmds)\n  return [(d, opens[d], closes[d], cmds[d]) for d in dates]\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each cron command, find the maximum elapsed time in seconds between any two consecutive executions of that same command. Floor the result to the nearest whole second (e.g. 900.99s becomes 900). Return the command and the maximum gap. This identifies missed or delayed scheduled executions.",
+          "output_format": [
+            "command",
+            "max_gap_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 4,
+          "n_gt": 4,
+          "translation": "def q4(eng):\n  groups = eng.group_by(_cmd_rows(eng), lambda r: r.get(\"command\"))\n  out = []\n  for cmd, rows in groups.items():\n    gap = eng.max_gap([r.epoch for r in rows])\n    if gap is not None:\n      out.append((cmd, math.floor(gap)))\n  return out\n"
+        },
+        "multiline_5": {
+          "natural_language": "Find cron sessions (by host and process ID) where a session was opened but no command was executed in the same process.",
+          "output_format": [
+            "host",
+            "process_id"
+          ],
+          "precision": 0.9998,
+          "recall": 1.0,
+          "f1": 0.9999,
+          "n_result": 4381,
+          "n_gt": 4380,
+          "translation": "def q5(eng):\n  out = []\n  for (host, pid), rows in eng.streams(eng.rows).items():\n    has_open = any(r.get(\"action\") == \"opened\" for r in rows)\n    has_cmd = any(r.get(\"command\") is not None for r in rows)\n    if has_open and not has_cmd:\n      out.append((host, int(pid)))\n  return out\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each distinct command executed by cron, return the earliest and latest execution timestamp text.",
+          "output_format": [
+            "command",
+            "earliest_timestamp",
+            "latest_timestamp"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 4,
+          "n_gt": 4,
+          "translation": "def q6(eng):\n  groups = eng.group_by(_cmd_rows(eng), lambda r: r.get(\"command\"))\n  out = []\n  for cmd, rows in groups.items():\n    rows = [r for r in rows if r.epoch is not None]\n    if not rows:\n      continue\n    first = min(rows, key=lambda r: r.epoch)\n    last = max(rows, key=lambda r: r.epoch)\n    out.append((cmd, first.get(\"timestamp\"), last.get(\"timestamp\")))\n  return out\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each date and 15-minute time interval, count the number of cron command executions. The interval is represented as minutes since midnight (0, 15, 30, 45, 60, ...). Return only intervals that had at least one execution.",
+          "output_format": [
+            "date",
+            "interval_minutes",
+            "execution_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 2476,
+          "n_gt": 2476,
+          "translation": "def q7(eng):\n  counts = defaultdict(int)\n  for r in _cmd_rows(eng):\n    if r.dt is None:\n      continue\n    interval = ((r.dt.hour * 60 + r.dt.minute) // 15) * 15\n    counts[(_date(r), interval)] += 1\n  return [(d, iv, c) for (d, iv), c in counts.items()]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each host and date, count the number of cron command executions and session opens.",
+          "output_format": [
+            "host",
+            "date",
+            "cmd_executions",
+            "session_opens"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 26,
+          "n_gt": 26,
+          "translation": "def q8(eng):\n  cmds = defaultdict(int)\n  opens = defaultdict(int)\n  for r in eng.rows:\n    d = _date(r)\n    host = r.get(\"host_name\")\n    if d is None or host is None:\n      continue\n    if r.get(\"command\") is not None:\n      cmds[(host, d)] += 1\n    if r.get(\"action\") == \"opened\":\n      opens[(host, d)] += 1\n  keys = set(cmds) | set(opens)\n  return [(h, d, cmds[(h, d)], opens[(h, d)]) for (h, d) in keys]\n"
+        }
+      },
+      "sshd": {
+        "multiline_1": {
+          "natural_language": "For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "failure_count",
+            "distinct_usernames_targeted"
+          ],
+          "precision": 0.4382,
+          "recall": 0.4815,
+          "f1": 0.4588,
+          "n_result": 89,
+          "n_gt": 81,
+          "translation": "def z1(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _fail(r) and _ip(r) is not None:\n      g[_ip(r)].append(r)\n  return [(ip, len(rs), len({_user(r) for r in rs})) for ip, rs in g.items()]\n"
+        },
+        "multiline_2": {
+          "natural_language": "Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "peak_failures_in_5min"
+          ],
+          "precision": 0.8125,
+          "recall": 0.8125,
+          "f1": 0.8125,
+          "n_result": 16,
+          "n_gt": 16,
+          "translation": "def z2(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _fail(r) and _ip(r) is not None:\n      g[_ip(r)].append(r.epoch)\n  out = []\n  for ip, epochs in g.items():\n    peak = eng.window_peak(epochs, 300)\n    if peak >= 10:\n      out.append((ip, peak))\n  return out\n"
+        },
+        "multiline_3": {
+          "natural_language": "Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "distinct_usernames"
+          ],
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "n_result": 9,
+          "n_gt": 10,
+          "translation": "def z3(eng):\n  g = defaultdict(set)\n  for r in eng.rows:\n    if _fail(r) and _ip(r) is not None:\n      g[_ip(r)].add(_user(r))\n  return [(ip, len(us)) for ip, us in g.items() if len(us) >= 5]\n"
+        },
+        "multiline_4": {
+          "natural_language": "Find users who had successful SSH logins from two different source IP addresses within 60 seconds of each other. Assume year 2000 for timestamps. Return the username and the two IP addresses.",
+          "output_format": [
+            "username",
+            "first_ip",
+            "second_ip"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 18,
+          "n_gt": 18,
+          "translation": "def z4(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _ok(r) and _ip(r) is not None and _user(r) is not None and r.epoch:\n      g[_user(r)].append((r.epoch, _ip(r)))\n  out = set()\n  for user, evs in g.items():\n    evs.sort()\n    for i in range(len(evs)):\n      for j in range(i + 1, len(evs)):\n        if evs[j][0] - evs[i][0] > 60:\n          break\n        if evs[i][1] != evs[j][1]:\n          out.add((user, evs[i][1], evs[j][1]))\n  return list(out)\n"
+        },
+        "multiline_5": {
+          "natural_language": "For each host, count SSH session opens and session closes, and compute the number of unclosed sessions (opens minus closes).",
+          "output_format": [
+            "host",
+            "session_opens",
+            "session_closes",
+            "unclosed_sessions"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 123,
+          "n_gt": 123,
+          "translation": "def z5(eng):\n  opens = defaultdict(int)\n  closes = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if r.get(\"action\") == \"opened\":\n      opens[h] += 1\n    elif r.get(\"action\") == \"closed\":\n      closes[h] += 1\n  hosts = set(opens) | set(closes)\n  return [(h, opens[h], closes[h], opens[h] - closes[h]) for h in hosts]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each source IP, count the number of failed SSH authentication events that specifically targeted the root account. Exclude connection-level events where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "root_failure_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 45,
+          "n_gt": 45,
+          "translation": "def z6(eng):\n  g = defaultdict(int)\n  for r in eng.rows:\n    if _fail(r) and _ip(r) is not None and r.get(\"user_name\") == \"root\":\n      g[_ip(r)] += 1\n  return [(ip, c) for ip, c in g.items()]\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each host and username with successful SSH logins, count the total logins and the number of distinct key fingerprints used. Only count 'Accepted' login events, not session events.",
+          "output_format": [
+            "host",
+            "username",
+            "login_count",
+            "distinct_key_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 36,
+          "n_gt": 36,
+          "translation": "def z7(eng):\n  logins = defaultdict(int)\n  keys = defaultdict(set)\n  for r in eng.rows:\n    if _ok(r):\n      k = (r.get(\"log_host\"), _user(r))\n      logins[k] += 1\n      if r.get(\"key_fingerprint\") is not None:\n        keys[k].add(r.get(\"key_fingerprint\"))\n  return [(h, u, logins[(h, u)], len(keys[(h, u)])) for (h, u) in logins]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.",
+          "output_format": [
+            "host",
+            "distinct_attacker_ips",
+            "distinct_legitimate_ips"
+          ],
+          "precision": 0.9692,
+          "recall": 0.9692,
+          "f1": 0.9692,
+          "n_result": 65,
+          "n_gt": 65,
+          "translation": "def z8(eng):\n  attackers = defaultdict(set)\n  legit = defaultdict(set)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if _fail(r) and _ip(r) is not None:\n      attackers[h].add(_ip(r))\n    if _ok(r) and _ip(r) is not None:\n      legit[h].add(_ip(r))\n  hosts = set(attackers) | set(legit)\n  return [(h, len(attackers[h]), len(legit[h])) for h in hosts]\n"
+        }
+      },
+      "audit": {
+        "multiline_1": {
+          "natural_language": "For each host, count SELinux AVC denial events and the number of distinct denied permissions.",
+          "output_format": [
+            "host",
+            "avc_denial_count",
+            "distinct_denied_permission_count"
+          ],
+          "precision": 0.9398,
+          "recall": 0.9452,
+          "f1": 0.9425,
+          "n_result": 349,
+          "n_gt": 347,
+          "translation": "def z1(eng):\n  cnt = defaultdict(int)\n  perms = defaultdict(set)\n  for r in eng.rows:\n    if (\"1400\" in _et(r) or \"AVC\" in _et(r)) and _denied(r):\n      h = r.get(\"log_host\")\n      cnt[h] += 1\n      if r.get(\"permission\") is not None:\n        perms[h].add(r.get(\"permission\"))\n  return [(h, cnt[h], len(perms[h])) for h in cnt]\n"
+        },
+        "multiline_2": {
+          "natural_language": "For each host, count SELinux policy load events and enforcing mode changes.",
+          "output_format": [
+            "host",
+            "policy_load_count",
+            "enforcing_change_count"
+          ],
+          "precision": 0.9944,
+          "recall": 0.9955,
+          "f1": 0.995,
+          "n_result": 892,
+          "n_gt": 891,
+          "translation": "def z2(eng):\n  loads = defaultdict(int)\n  enf = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if r.get(\"event_action\") == \"loaded\":\n      loads[h] += 1\n    if r.get(\"enforcing_status\") is not None:\n      enf[h] += 1\n  hosts = set(loads) | set(enf)\n  return [(h, loads[h], enf[h]) for h in hosts]\n"
+        },
+        "multiline_3": {
+          "natural_language": "Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.",
+          "output_format": [
+            "host",
+            "boolean_name",
+            "disable_event_timestamp",
+            "enable_event_timestamp"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 14,
+          "n_gt": 14,
+          "translation": "def z3(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if r.get(\"boolean_name\") is not None and _etime(r) is not None:\n      g[(r.get(\"log_host\"), r.get(\"boolean_name\"))].append(\n          (_etime(r), r.get(\"boolean_value\")))\n  out = []\n  for (host, name), evs in g.items():\n    evs.sort()\n    # pair each disable (val 0) with the next enable (val 1) after it.\n    i = 0\n    while i < len(evs):\n      if evs[i][1] == \"0\":\n        for j in range(i + 1, len(evs)):\n          if evs[j][1] == \"1\":\n            out.append((host, name, evs[i][0], evs[j][0]))\n            i = j\n            break\n      i += 1\n  return out\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each host and PAM action, count total PAM events and how many of those events ended in failure.",
+          "output_format": [
+            "host",
+            "pam_action",
+            "pam_event_count",
+            "failed_pam_event_count"
+          ],
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "n_result": 99,
+          "n_gt": 93,
+          "translation": "def z4(eng):\n  total = defaultdict(int)\n  failed = defaultdict(int)\n  for r in eng.rows:\n    pa = r.get(\"pam_action\")\n    if pa is None:\n      continue\n    k = (r.get(\"log_host\"), pa)\n    total[k] += 1\n    if r.get(\"outcome\") == \"failed\":\n      failed[k] += 1\n  return [(h, pa, total[(h, pa)], failed[(h, pa)]) for (h, pa) in total]\n"
+        },
+        "multiline_5": {
+          "natural_language": "For each source address, count failed SSH authentication attempts recorded by sshd.",
+          "output_format": [
+            "source_address",
+            "failed_ssh_attempt_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 23,
+          "n_gt": 23,
+          "translation": "def z5(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    if (r.get(\"executable_path\") == \"/usr/sbin/sshd\"\n        and r.get(\"outcome\") == \"failed\" and r.get(\"source_address\") is not None):\n      cnt[r.get(\"source_address\")] += 1\n  return [(ip, c) for ip, c in cnt.items()]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each systemd service unit, count unit start events and unit stop events.",
+          "output_format": [
+            "service_unit",
+            "unit_start_count",
+            "unit_stop_count"
+          ],
+          "precision": 0.8166,
+          "recall": 0.8539,
+          "f1": 0.8348,
+          "n_result": 229,
+          "n_gt": 219,
+          "translation": "def z6(eng):\n  starts = defaultdict(int)\n  stops = defaultdict(int)\n  for r in eng.rows:\n    su = r.get(\"service_unit\")\n    if su is None:\n      continue\n    et = _et(r)\n    if \"1130\" in et or \"SERVICE_START\" in et:\n      starts[su] += 1\n    if \"1131\" in et or \"SERVICE_STOP\" in et:\n      stops[su] += 1\n  units = set(starts) | set(stops)\n  return [(su, starts[su], stops[su]) for su in units]\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each host, count audit subsystem initialization events and audit daemon process ID set events.",
+          "output_format": [
+            "host",
+            "audit_initialized_count",
+            "audit_pid_set_count"
+          ],
+          "precision": 0.977,
+          "recall": 0.9517,
+          "f1": 0.9642,
+          "n_result": 1129,
+          "n_gt": 1159,
+          "translation": "def z7(eng):\n  init = defaultdict(int)\n  pidset = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if r.get(\"event_action\") == \"initialized\":\n      init[h] += 1\n    if r.get(\"audit_process_id\") is not None:\n      pidset[h] += 1\n  hosts = set(init) | set(pidset)\n  return [(h, init[h], pidset[h]) for h in hosts]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each executable path and signal number, count crash signal events.",
+          "output_format": [
+            "executable_path",
+            "signal_number",
+            "crash_event_count"
+          ],
+          "precision": 0.7273,
+          "recall": 1.0,
+          "f1": 0.8421,
+          "n_result": 11,
+          "n_gt": 8,
+          "translation": "def z8(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    if r.get(\"signal_number\") is not None:\n      cnt[(r.get(\"executable_path\"), str(r.get(\"signal_number\")))] += 1\n  return [(ep, sig, c) for (ep, sig), c in cnt.items()]\n"
+        }
+      },
+      "puppet": {
+        "multiline_1": {
+          "natural_language": "For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.",
+          "output_format": [
+            "host",
+            "started_run_stream_count",
+            "finished_run_stream_count",
+            "completion_rate"
+          ],
+          "precision": 0.0625,
+          "recall": 0.12,
+          "f1": 0.0822,
+          "n_result": 48,
+          "n_gt": 25,
+          "translation": "def z1(eng):\n  started = defaultdict(int)\n  finished = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if _c(r, \"Applying configuration version\"):\n      started[h] += 1\n    if _c(r, \"Finished catalog run\"):\n      finished[h] += 1\n  hosts = set(started) | set(finished)\n  out = []\n  for h in hosts:\n    s = started[h]\n    rate = finished[h] / s if s else 0.0\n    out.append((h, s, finished[h], rate))\n  return out\n"
+        },
+        "multiline_2": {
+          "natural_language": "For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds, rounded to two decimal places.",
+          "output_format": [
+            "host",
+            "average_runtime_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 47,
+          "n_gt": 47,
+          "translation": "def z2(eng):\n  durs = defaultdict(list)\n  for r in eng.rows:\n    if _c(r, \"Finished catalog run\") and r.get(\"duration\") is not None:\n      try:\n        durs[r.get(\"log_host\")].append(float(str(r.get(\"duration\")).split()[0]))\n      except ValueError:\n        pass\n  return [(h, round(sum(v) / len(v), 2)) for h, v in durs.items() if v]\n"
+        },
+        "multiline_3": {
+          "natural_language": "Find Puppet agent processes where a node-definition fetch failure is later followed by use of a cached catalog. Return the host, process id, and the original syslog timestamp text from those two events.",
+          "output_format": [
+            "host",
+            "process_id",
+            "failure_timestamp",
+            "cached_catalog_timestamp"
+          ],
+          "precision": 0.0303,
+          "recall": 0.0465,
+          "f1": 0.0367,
+          "n_result": 66,
+          "n_gt": 43,
+          "translation": "def z3(eng):\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if _pid(r) is not None:\n      streams[(r.get(\"log_host\"), _pid(r))].append(r)\n  out = []\n  for (h, pid), rows in streams.items():\n    fail_ts = None\n    for r in rows:\n      if fail_ts is None and _c(r, \"Could not retrieve catalog\"):\n        fail_ts = _ts(r)\n      elif fail_ts is not None and _c(r, \"Using cached catalog\"):\n        out.append((h, pid, fail_ts, _ts(r)))\n        fail_ts = None\n  return out\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each host that saw report-send failures or remote catalog retrieval failures, count both and return those two totals.",
+          "output_format": [
+            "host",
+            "report_failure_count",
+            "catalog_retrieval_failure_count"
+          ],
+          "precision": 0.4211,
+          "recall": 0.4211,
+          "f1": 0.4211,
+          "n_result": 19,
+          "n_gt": 19,
+          "translation": "def z4(eng):\n  rep = defaultdict(int)\n  ret = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if _c(r, \"Could not send report\"):\n      rep[h] += 1\n    if _c(r, \"Could not retrieve catalog\"):\n      ret[h] += 1\n  hosts = set(rep) | set(ret)\n  return [(h, rep[h], ret[h]) for h in hosts]\n"
+        },
+        "multiline_5": {
+          "natural_language": "For each Puppet module name appearing after '/Stage[main]/' in skipped resource identifiers, count how many resources were skipped because of failed dependencies.",
+          "output_format": [
+            "module_name",
+            "skipped_dependency_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 151,
+          "n_gt": 151,
+          "translation": "def z5(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    if not _c(r, \"Skipping because of failed dependencies\"):\n      continue\n    rid = r.get(\"resource_identifier\") or r.content\n    marker = \"/Stage[main]/\"\n    if marker in rid:\n      tail = rid.split(marker, 1)[1]\n      module = tail.split(\"/\", 1)[0]\n      if module:\n        cnt[module] += 1\n  return [(m, c) for m, c in cnt.items()]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.",
+          "output_format": [
+            "host",
+            "error_family",
+            "occurrence_count"
+          ],
+          "precision": 0.4286,
+          "recall": 0.7895,
+          "f1": 0.5556,
+          "n_result": 35,
+          "n_gt": 19,
+          "translation": "def z6(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    c = r.content\n    for fam, keys in _FAMILIES:\n      if any(k in c for k in keys):\n        cnt[(r.get(\"log_host\"), fam)] += 1\n  return [(h, fam, n) for (h, fam), n in cnt.items()]\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each host and Puppet agent process that logged refresh activity, count how many refreshes were scheduled and how many refreshes were triggered.",
+          "output_format": [
+            "host",
+            "process_id",
+            "scheduled_refresh_count",
+            "triggered_refresh_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 204,
+          "n_gt": 204,
+          "translation": "def z7(eng):\n  sched = defaultdict(int)\n  trig = defaultdict(int)\n  for r in eng.rows:\n    if _pid(r) is None:\n      continue\n    k = (r.get(\"log_host\"), _pid(r))\n    if _c(r, \"Scheduling refresh\"):\n      sched[k] += 1\n    if _c(r, \"Triggered 'refresh'\"):\n      trig[k] += 1\n  keys = set(sched) | set(trig)\n  return [(h, pid, sched[(h, pid)], trig[(h, pid)]) for (h, pid) in keys]\n"
+        },
+        "multiline_8": {
+          "natural_language": "Find Puppet agent processes where a remote catalog retrieval failure is followed by use of a cached catalog and then a report-send failure. Return the host, process id, and the original syslog timestamp text from those three events.",
+          "output_format": [
+            "host",
+            "process_id",
+            "catalog_failure_timestamp",
+            "cached_catalog_timestamp",
+            "report_failure_timestamp"
+          ],
+          "precision": 0.9643,
+          "recall": 0.9643,
+          "f1": 0.9643,
+          "n_result": 28,
+          "n_gt": 28,
+          "translation": "def z8(eng):\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if _pid(r) is not None:\n      streams[(r.get(\"log_host\"), _pid(r))].append(r)\n  out = []\n  for (h, pid), rows in streams.items():\n    fail_ts = cached_ts = None\n    for r in rows:\n      if fail_ts is None and _c(r, \"Could not retrieve catalog\"):\n        fail_ts = _ts(r)\n      elif fail_ts is not None and cached_ts is None and _c(r, \"Using cached catalog\"):\n        cached_ts = _ts(r)\n      elif fail_ts is not None and cached_ts is not None and _c(r, \"Could not send report\"):\n        out.append((h, pid, fail_ts, cached_ts, _ts(r)))\n        fail_ts = cached_ts = None\n  return out\n"
+        }
+      },
+      "dhcp": {
+        "multiline_1": {
+          "natural_language": "Find transactions where time from DHCPREQUEST to DHCPACK exceeds 5 seconds. Return a list of pairs of transaction ids and duration.",
+          "output_format": [
+            "transaction_id",
+            "duration_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 0.7362,
+          "f1": 0.8481,
+          "n_result": 120,
+          "n_gt": 163,
+          "translation": "def z1(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    req = _ep(rows, \"DHCPREQUEST\")\n    if req is None:\n      continue\n    acks = [r.epoch for r in rows if _has(r, \"DHCPACK\") and r.epoch is not None\n            and r.epoch >= req]\n    if acks and min(acks) - req > 5:\n      out.append((t, min(acks) - req))\n  return out\n"
+        },
+        "multiline_2": {
+          "natural_language": "Find hosts issuing >100 DHCPREQUESTs within any 30-minute rolling window. Report the times of the first and last REQUEST of the first such window with the largest number of requests for each host.",
+          "output_format": [
+            "host",
+            "request_count_in_30min_window",
+            "window_start",
+            "window_end"
+          ],
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "n_result": 30,
+          "n_gt": 30,
+          "translation": "def z2(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _has(r, \"DHCPREQUEST\") and r.epoch is not None:\n      g[r.get(\"log_host\")].append(r.epoch)\n  out = []\n  for host, epochs in g.items():\n    epochs.sort()\n    best = None\n    j = 0\n    for i in range(len(epochs)):\n      while j < len(epochs) and epochs[j] - epochs[i] < 1800:\n        j += 1\n      cnt = j - i\n      if best is None or cnt > best[0]:\n        best = (cnt, epochs[i], epochs[j - 1])\n    if best and best[0] > 100:\n      out.append((host, best[0], best[1], best[2]))\n  return out\n"
+        },
+        "multiline_3": {
+          "natural_language": "Identify transaction_ids where a second DHCPREQUEST occurs before the DHCPACK for the first.",
+          "output_format": [
+            "transaction_id"
+          ],
+          "precision": 1.0,
+          "recall": 0.0409,
+          "f1": 0.0786,
+          "n_result": 24,
+          "n_gt": 587,
+          "translation": "def z3(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    ack = _ep(rows, \"DHCPACK\")\n    if ack is None:\n      continue\n    reqs = [r.epoch for r in rows if _has(r, \"DHCPREQUEST\")\n            and r.epoch is not None and r.epoch < ack]\n    if len(reqs) >= 2:\n      out.append(t)\n  return out\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each client that sent at least one DHCPDISCOVER with an explicit transaction ID, count how many transaction IDs begin with DHCPDISCOVER, how many of those later contain DHCPACK, and the resulting completion rate.",
+          "output_format": [
+            "client",
+            "discover_started_transactions",
+            "completed_with_ack",
+            "completion_rate"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 196,
+          "n_gt": 196,
+          "translation": "def z4(eng):\n  disc = defaultdict(set)\n  ack = defaultdict(set)\n  for (host, t), rows in _by_client_txn(eng).items():\n    if any(_has(r, \"DHCPDISCOVER\") for r in rows):\n      disc[host].add(t)\n      if any(_has(r, \"DHCPACK\") for r in rows):\n        ack[host].add(t)\n  out = []\n  for host, ts in disc.items():\n    d = len(ts)\n    a = len(ack[host])\n    out.append((host, d, a, a / d if d else 0.0))\n  return out\n"
+        },
+        "multiline_5": {
+          "natural_language": "Considering only client/process streams that contain DHCPDISCOVER, DHCPOFFER, DHCPREQUEST, and DHCPACK, return for each client the average elapsed seconds between the DISCOVER and ACK.",
+          "output_format": [
+            "client",
+            "avg_discover_to_ack_seconds"
+          ],
+          "precision": 0.6333,
+          "recall": 0.4547,
+          "f1": 0.5294,
+          "n_result": 420,
+          "n_gt": 585,
+          "translation": "def z5(eng):\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if r.get(\"process_id\") is not None:\n      streams[(r.get(\"log_host\"), r.get(\"process_id\"))].append(r)\n  per_client = defaultdict(list)\n  for (host, _), rows in streams.items():\n    types = set().union(*[_msgs(r) for r in rows]) if rows else set()\n    if {\"DHCPDISCOVER\", \"DHCPOFFER\", \"DHCPREQUEST\", \"DHCPACK\"} <= types:\n      d = _ep(rows, \"DHCPDISCOVER\")\n      a = _ep(rows, \"DHCPACK\")\n      if d is not None and a is not None:\n        per_client[host].append(a - d)\n  return [(h, round(sum(v) / len(v), 6)) for h, v in per_client.items() if v]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each DHCP server IP address, count the total number of OFFER messages sent. Then count how many of those OFFER messages resulted in a corresponding ACK within 60 seconds for the same transaction. Compute the conversion rate.",
+          "output_format": [
+            "server_ip",
+            "offer_total",
+            "offer_with_ack_60s",
+            "conversion_rate"
+          ],
+          "precision": 0.9502,
+          "recall": 0.9519,
+          "f1": 0.9511,
+          "n_result": 542,
+          "n_gt": 541,
+          "translation": "def z6(eng):\n  offers = defaultdict(list)\n  acks = defaultdict(list)\n  for r in eng.rows:\n    if r.epoch is None or r.get(\"source_ip\") is None:\n      continue\n    if _has(r, \"DHCPOFFER\"):\n      offers[r.get(\"source_ip\")].append(r.epoch)\n    if _has(r, \"DHCPACK\"):\n      acks[r.get(\"source_ip\")].append(r.epoch)\n  out = []\n  for ip, offs in offers.items():\n    ack_times = sorted(acks.get(ip, []))\n    matched = 0\n    for t in offs:\n      if any(t <= a <= t + 60 for a in ack_times):\n        matched += 1\n    total = len(offs)\n    out.append((ip, total, matched, matched / total if total else 0.0))\n  return out\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each client, count transaction IDs that contain a DISCOVER and do not contain an ACK within 120 seconds. Only use transactions with an explicit transaction ID, return only clients with a nonzero count, and sort the results in descending order.",
+          "output_format": [
+            "client",
+            "discover_without_ack_120s_count"
+          ],
+          "precision": 1.0,
+          "recall": 0.9762,
+          "f1": 0.988,
+          "n_result": 41,
+          "n_gt": 42,
+          "translation": "def z7(eng):\n  cnt = defaultdict(int)\n  for (host, t), rows in _by_client_txn(eng).items():\n    d = _ep(rows, \"DHCPDISCOVER\")\n    if d is None:\n      continue\n    acks = [r.epoch for r in rows if _has(r, \"DHCPACK\") and r.epoch is not None]\n    if not any(d <= a <= d + 120 for a in acks):\n      cnt[host] += 1\n  return [(h, c) for h, c in cnt.items()]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each client and network interface, count the total number of DISCOVER and REQUEST messages observed. Output one row per client and interface.",
+          "output_format": [
+            "client",
+            "interface",
+            "discover_count",
+            "request_count"
+          ],
+          "precision": 0.9863,
+          "recall": 0.9863,
+          "f1": 0.9863,
+          "n_result": 1533,
+          "n_gt": 1533,
+          "translation": "def z8(eng):\n  disc = defaultdict(int)\n  req = defaultdict(int)\n  for r in eng.rows:\n    k = (r.get(\"log_host\") or \"(none)\", r.get(\"interface_name\"))\n    if r.get(\"interface_name\") is None:\n      continue\n    if _has(r, \"DHCPDISCOVER\"):\n      disc[k] += 1\n    if _has(r, \"DHCPREQUEST\"):\n      req[k] += 1\n  keys = set(disc) | set(req)\n  return [(h, i, disc[(h, i)], req[(h, i)]) for (h, i) in keys]\n"
+        },
+        "multiline_9": {
+          "natural_language": "For each client, calculate the average number of DHCP messages logged per transaction ID. Only count DHCP messages that specify a transaction ID. ",
+          "output_format": [
+            "client",
+            "avg_messages_per_transaction"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 342,
+          "n_gt": 342,
+          "translation": "def z9(eng):\n  msgs = defaultdict(int)\n  txns = defaultdict(set)\n  for r in eng.rows:\n    t = _txn(r)\n    if t is None:\n      continue\n    msgs[r.get(\"log_host\")] += 1\n    txns[r.get(\"log_host\")].add(t)\n  return [(h, round(msgs[h] / len(txns[h]), 6)) for h in msgs if txns[h]]\n"
+        },
+        "multiline_10": {
+          "natural_language": "For each hour 0 through 23, count unique transaction IDs whose DISCOVER occurred in that hour. Then count how many of those same transaction IDs have an ACK anywhere in the log. Use only explicit transaction IDs and return all 24 hours with the completion rate for each hour.",
+          "output_format": [
+            "hour_of_day",
+            "discover_transaction_count",
+            "completed_with_ack_count",
+            "completion_rate"
+          ],
+          "precision": 0.125,
+          "recall": 0.125,
+          "f1": 0.125,
+          "n_result": 24,
+          "n_gt": 24,
+          "translation": "def z10(eng):\n  disc_hour = {}\n  has_ack = defaultdict(bool)\n  for t, rows in _by_txn(eng).items():\n    ds = [r for r in rows if _has(r, \"DHCPDISCOVER\") and r.dt is not None]\n    if not ds:\n      continue\n    hour = min(ds, key=lambda r: r.epoch).dt.hour\n    disc_hour[t] = hour\n    has_ack[t] = any(_has(r, \"DHCPACK\") for r in rows)\n  per_hour = defaultdict(lambda: [0, 0])\n  for t, hour in disc_hour.items():\n    per_hour[hour][0] += 1\n    if has_ack[t]:\n      per_hour[hour][1] += 1\n  out = []\n  for h in range(24):\n    d, a = per_hour[h]\n    out.append((h, d, a, a / d if d else 0.0))\n  return out\n"
+        },
+        "multiline_11": {
+          "natural_language": "Return the 1-indexed line number and hostname for each DHCPOFFER line where no DHCPDISCOVER from the same hostname/process stream occurred in the previous 30 seconds. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream.",
+          "output_format": [
+            "line_id",
+            "client"
+          ],
+          "precision": 1.0,
+          "recall": 0.087,
+          "f1": 0.16,
+          "n_result": 2,
+          "n_gt": 23,
+          "translation": "def z11(eng):\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if r.get(\"process_id\") is not None:\n      streams[(r.get(\"log_host\"), r.get(\"process_id\"))].append(r)\n  out = []\n  for rows in streams.values():\n    disc = [r.epoch for r in rows if _has(r, \"DHCPDISCOVER\") and r.epoch is not None]\n    for r in rows:\n      if _has(r, \"DHCPOFFER\") and r.epoch is not None:\n        if not any(r.epoch - 30 <= d <= r.epoch for d in disc):\n          out.append((r.line_id, r.get(\"log_host\")))\n  return out\n"
+        },
+        "multiline_12": {
+          "natural_language": "Identify ACK messages where no matching REQUEST from the same transaction occurred within the previous 30 seconds.",
+          "output_format": [
+            "line_id",
+            "transaction_id"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 0,
+          "n_gt": 0,
+          "translation": "def z12(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    reqs = [r.epoch for r in rows if _has(r, \"DHCPREQUEST\") and r.epoch is not None]\n    for r in rows:\n      if _has(r, \"DHCPACK\") and r.epoch is not None:\n        if not any(r.epoch - 30 <= q <= r.epoch for q in reqs):\n          out.append((r.line_id, t))\n  return out\n"
+        },
+        "multiline_13": {
+          "natural_language": "Identify invalid DHCP cycle transitions by hostname and transaction ID. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream. Valid repeated cycles are DHCPDISCOVER -> DHCPOFFER -> DHCPREQUEST -> DHCPACK and DHCPREQUEST -> DHCPACK. Treat incomplete trailing sequences as allowed; only explicit bad transitions are violations.",
+          "output_format": [
+            "client",
+            "transaction_id"
+          ],
+          "precision": 0.8577,
+          "recall": 0.2103,
+          "f1": 0.3378,
+          "n_result": 1434,
+          "n_gt": 5849,
+          "translation": "def z13(eng):\n  # propagate txn per stream.\n  streams = defaultdict(list)\n  last_txn = {}\n  rows_txn = []\n  for r in eng.rows:\n    key = (r.get(\"log_host\"), r.get(\"process_id\"))\n    t = _txn(r)\n    if t is not None:\n      last_txn[key] = t\n    else:\n      t = last_txn.get(key)\n    rows_txn.append((r, t))\n  g = defaultdict(list)\n  for r, t in rows_txn:\n    if t is not None:\n      m = _msgs(r) & set(_RANK)\n      if m:\n        g[(r.get(\"log_host\"), t)].append((r.epoch or 0, r.line_id, min(m, key=_RANK.get)))\n  out = []\n  for (host, t), evs in g.items():\n    evs.sort()\n    prev = None\n    bad = False\n    for _, _, m in evs:\n      rank = _RANK[m]\n      if prev is not None and rank < prev and m != \"DHCPDISCOVER\":\n        bad = True\n        break\n      prev = rank\n    if bad:\n      out.append((host, t))\n  return out\n"
+        },
+        "multiline_14": {
+          "natural_language": "Identify transactions where two or more REQUEST messages occur before the first ACK.",
+          "output_format": [
+            "transaction_id"
+          ],
+          "precision": 1.0,
+          "recall": 0.0475,
+          "f1": 0.0907,
+          "n_result": 24,
+          "n_gt": 505,
+          "translation": "def z14(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    ack = _ep(rows, \"DHCPACK\")\n    reqs = [r.epoch for r in rows if _has(r, \"DHCPREQUEST\") and r.epoch is not None]\n    if ack is None:\n      continue\n    before = [q for q in reqs if q < ack]\n    if len(before) >= 2:\n      out.append(t)\n  return out\n"
+        },
+        "multiline_15": {
+          "natural_language": "For completed transactions, calculate the time difference in seconds between the REQUEST and the ACK. List transactions where this latency exceeds 5 seconds.",
+          "output_format": [
+            "transaction_id",
+            "request_to_ack_latency_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 0.7362,
+          "f1": 0.8481,
+          "n_result": 120,
+          "n_gt": 163,
+          "translation": "def z15(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    req = _ep(rows, \"DHCPREQUEST\")\n    ack = _ep(rows, \"DHCPACK\")\n    if req is not None and ack is not None and ack - req > 5:\n      out.append((t, ack - req))\n  return out\n"
+        },
+        "multiline_16": {
+          "natural_language": "Identify transactions (same client and transaction ID) where two or more DISCOVER messages occur within 60 seconds and no OFFER is present.",
+          "output_format": [
+            "client",
+            "transaction_id"
+          ],
+          "precision": 0.9681,
+          "recall": 1.0,
+          "f1": 0.9838,
+          "n_result": 4421,
+          "n_gt": 4280,
+          "translation": "def z16(eng):\n  out = []\n  for (host, t), rows in _by_client_txn(eng).items():\n    if any(_has(r, \"DHCPOFFER\") for r in rows):\n      continue\n    ds = sorted(r.epoch for r in rows if _has(r, \"DHCPDISCOVER\") and r.epoch is not None)\n    if len(ds) < 2:\n      continue\n    if any(ds[i + 1] - ds[i] <= 60 for i in range(len(ds) - 1)):\n      out.append((host, t))\n  return out\n"
+        },
+        "multiline_17": {
+          "natural_language": "Identify DHCP exchanges where the client received at least two OFFERs from different servers before getting an ACK. Return the client hostname, process id, transaction id, timestamp of the event, list of server ips, and ACKed server for each instance.",
+          "output_format": [
+            "client",
+            "process_id",
+            "transaction_id",
+            "ack_timestamp",
+            "offer_server_ips",
+            "ack_server_ip"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 0,
+          "n_gt": 0,
+          "translation": "def z17(eng):\n  out = []\n  for (host, t), rows in _by_client_txn(eng).items():\n    ack = _ep(rows, \"DHCPACK\")\n    if ack is None:\n      continue\n    servers = {r.get(\"source_ip\") for r in rows\n               if _has(r, \"DHCPOFFER\") and r.epoch is not None and r.epoch < ack\n               and r.get(\"source_ip\") is not None}\n    if len(servers) >= 2:\n      pid = rows[0].get(\"process_id\")\n      out.append((host, pid, t, ack, tuple(sorted(servers)), rows[0].get(\"source_ip\")))\n  return out\n"
+        },
+        "multiline_18": {
+          "natural_language": "Are there any cases where two different clients were assigned the same IP address at exactly the same timestamp?",
+          "output_format": [
+            "assigned_ip",
+            "timestamp",
+            "clients"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 0,
+          "n_gt": 0,
+          "translation": "def z18(eng):\n  g = defaultdict(set)\n  for r in eng.rows:\n    ip = r.get(\"assigned_ip\")\n    if ip is not None and r.epoch is not None:\n      g[(ip, r.epoch)].add(r.get(\"log_host\"))\n  out = []\n  for (ip, ts), clients in g.items():\n    if len(clients) >= 2:\n      out.append((ip, ts, tuple(sorted(clients))))\n  return out\n"
+        },
+        "multiline_19": {
+          "natural_language": "Are there any transactions (same client and transaction ID) where DISCOVER, OFFER, REQUEST, and ACK all occurred at exactly the same timestamp?",
+          "output_format": [
+            "client",
+            "transaction_id",
+            "timestamp"
+          ],
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "n_result": 741,
+          "n_gt": 743,
+          "translation": "def z19(eng):\n  # group by (client, epoch), then require all four types; take txn from group.\n  g = defaultdict(list)\n  for r in eng.rows:\n    if r.epoch is not None:\n      g[(r.get(\"log_host\"), r.epoch)].append(r)\n  out = []\n  for (host, ts), rows in g.items():\n    types = set().union(*[_msgs(r) for r in rows])\n    if {\"DHCPDISCOVER\", \"DHCPOFFER\", \"DHCPREQUEST\", \"DHCPACK\"} <= types:\n      txns = [_txn(r) for r in rows if _txn(r) is not None]\n      if txns:\n        out.append((host, txns[0], ts))\n  return out\n"
+        },
+        "multiline_20": {
+          "natural_language": "Associate each assigned IP with the MAC address reported for that client/process stream, and return the timestamp, client MAC, and assigned IP.",
+          "output_format": [
+            "timestamp",
+            "client_mac",
+            "assigned_ip"
+          ],
+          "precision": 0.0002,
+          "recall": 0.0005,
+          "f1": 0.0003,
+          "n_result": 32834,
+          "n_gt": 14605,
+          "translation": "def z20(eng):\n  stream_mac = {}\n  for r in eng.rows:\n    if r.get(\"interface_mac\") is not None:\n      stream_mac[(r.get(\"log_host\"), r.get(\"process_id\"))] = r.get(\"interface_mac\")\n  out = []\n  for r in eng.rows:\n    ip = r.get(\"assigned_ip\")\n    if ip is None or r.epoch is None:\n      continue\n    mac = stream_mac.get((r.get(\"log_host\"), r.get(\"process_id\")))\n    out.append((r.epoch, mac, ip))\n  return out\n"
+        },
+        "multiline_21": {
+          "natural_language": "Find DHCP renewals where a DHCPREQUEST occurs within 25% of the stated renewal time after the lease was bound in the same host/process stream. Return the hostname, assigned IP, and elapsed seconds from the bound event to the REQUEST.",
+          "output_format": [
+            "hostname",
+            "assigned_ip",
+            "lease_renewal_time_seconds"
+          ],
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "n_result": 0,
+          "n_gt": 4356,
+          "translation": "def z21(eng):\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if r.get(\"process_id\") is not None:\n      streams[(r.get(\"log_host\"), r.get(\"process_id\"))].append(r)\n  out = []\n  for (host, _), rows in streams.items():\n    rows.sort(key=lambda r: (r.epoch or 0, r.line_id))\n    for r in rows:\n      if r.get(\"action\") == \"bound\" and r.get(\"lease_renewal_duration\") is not None:\n        try:\n          T = float(r.get(\"lease_renewal_duration\"))\n        except (TypeError, ValueError):\n          continue\n        ip = r.get(\"assigned_ip\")\n        bound_ep = r.epoch\n        if bound_ep is None:\n          continue\n        for r2 in rows:\n          if (_has(r2, \"DHCPREQUEST\") and r2.epoch is not None\n              and bound_ep < r2.epoch <= bound_ep + 0.25 * T):\n            out.append((host, ip, T))\n            break\n  return out\n"
+        }
+      }
+    }
+  },
+  "best_effort": {
+    "summary": {
+      "cron": {
+        "n_queries": 8,
+        "mean_f1": 1.0
+      },
+      "sshd": {
+        "n_queries": 8,
+        "mean_f1": 0.9888
+      },
+      "audit": {
+        "n_queries": 8,
+        "mean_f1": 0.9571
+      },
+      "puppet": {
+        "n_queries": 8,
+        "mean_f1": 0.9769
+      },
+      "dhcp": {
+        "n_queries": 21,
+        "mean_f1": 0.8934
+      },
+      "overall": {
+        "n_queries": 53,
+        "mean_f1": 0.9461
+      }
+    },
+    "logs": {
+      "cron": {
+        "multiline_1": {
+          "natural_language": "For each distinct command executed by cron, count how many times it was executed and by how many distinct users.",
+          "output_format": [
+            "command",
+            "execution_count",
+            "distinct_user_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 4,
+          "n_gt": 4,
+          "translation": "def q1(eng):\n  groups = eng.group_by(_cmd_rows(eng), lambda r: r.get(\"command\"))\n  out = []\n  for cmd, rows in groups.items():\n    users = {r.get(\"system_user\") for r in rows}\n    out.append((cmd, len(rows), len(users)))\n  return out\n"
+        },
+        "multiline_2": {
+          "natural_language": "For each hour of the day (0 through 23), count the total number of cron job command executions.",
+          "output_format": [
+            "hour",
+            "execution_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 24,
+          "n_gt": 24,
+          "translation": "def q2(eng):\n  counts = defaultdict(int)\n  for r in _cmd_rows(eng):\n    if r.dt is not None:\n      counts[r.dt.hour] += 1\n  return [(h, counts.get(h, 0)) for h in range(24)]\n"
+        },
+        "multiline_3": {
+          "natural_language": "For each date, count the number of cron session opens, session closes, and command executions.",
+          "output_format": [
+            "date",
+            "session_opens",
+            "session_closes",
+            "cmd_executions"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 26,
+          "n_gt": 26,
+          "translation": "def q3(eng):\n  opens = defaultdict(int)\n  closes = defaultdict(int)\n  cmds = defaultdict(int)\n  for r in eng.rows:\n    d = _date(r)\n    if d is None:\n      continue\n    a = r.get(\"action\")\n    if a == \"opened\":\n      opens[d] += 1\n    elif a == \"closed\":\n      closes[d] += 1\n    if r.get(\"command\") is not None:\n      cmds[d] += 1\n  dates = set(opens) | set(closes) | set(cmds)\n  return [(d, opens[d], closes[d], cmds[d]) for d in dates]\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each cron command, find the maximum elapsed time in seconds between any two consecutive executions of that same command. Floor the result to the nearest whole second (e.g. 900.99s becomes 900). Return the command and the maximum gap. This identifies missed or delayed scheduled executions.",
+          "output_format": [
+            "command",
+            "max_gap_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 4,
+          "n_gt": 4,
+          "translation": "def q4(eng):\n  groups = eng.group_by(_cmd_rows(eng), lambda r: r.get(\"command\"))\n  out = []\n  for cmd, rows in groups.items():\n    gap = eng.max_gap([r.epoch for r in rows])\n    if gap is not None:\n      out.append((cmd, math.floor(gap)))\n  return out\n"
+        },
+        "multiline_5": {
+          "natural_language": "Find cron sessions (by host and process ID) where a session was opened but no command was executed in the same process.",
+          "output_format": [
+            "host",
+            "process_id"
+          ],
+          "precision": 0.9998,
+          "recall": 1.0,
+          "f1": 0.9999,
+          "n_result": 4381,
+          "n_gt": 4380,
+          "translation": "def q5(eng):\n  out = []\n  for (host, pid), rows in eng.streams(eng.rows).items():\n    has_open = any(r.get(\"action\") == \"opened\" for r in rows)\n    has_cmd = any(r.get(\"command\") is not None for r in rows)\n    if has_open and not has_cmd:\n      out.append((host, int(pid)))\n  return out\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each distinct command executed by cron, return the earliest and latest execution timestamp text.",
+          "output_format": [
+            "command",
+            "earliest_timestamp",
+            "latest_timestamp"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 4,
+          "n_gt": 4,
+          "translation": "def q6(eng):\n  groups = eng.group_by(_cmd_rows(eng), lambda r: r.get(\"command\"))\n  out = []\n  for cmd, rows in groups.items():\n    rows = [r for r in rows if r.epoch is not None]\n    if not rows:\n      continue\n    first = min(rows, key=lambda r: r.epoch)\n    last = max(rows, key=lambda r: r.epoch)\n    out.append((cmd, first.get(\"timestamp\"), last.get(\"timestamp\")))\n  return out\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each date and 15-minute time interval, count the number of cron command executions. The interval is represented as minutes since midnight (0, 15, 30, 45, 60, ...). Return only intervals that had at least one execution.",
+          "output_format": [
+            "date",
+            "interval_minutes",
+            "execution_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 2476,
+          "n_gt": 2476,
+          "translation": "def q7(eng):\n  counts = defaultdict(int)\n  for r in _cmd_rows(eng):\n    if r.dt is None:\n      continue\n    interval = ((r.dt.hour * 60 + r.dt.minute) // 15) * 15\n    counts[(_date(r), interval)] += 1\n  return [(d, iv, c) for (d, iv), c in counts.items()]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each host and date, count the number of cron command executions and session opens.",
+          "output_format": [
+            "host",
+            "date",
+            "cmd_executions",
+            "session_opens"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 26,
+          "n_gt": 26,
+          "translation": "def q8(eng):\n  cmds = defaultdict(int)\n  opens = defaultdict(int)\n  for r in eng.rows:\n    d = _date(r)\n    host = r.get(\"host_name\")\n    if d is None or host is None:\n      continue\n    if r.get(\"command\") is not None:\n      cmds[(host, d)] += 1\n    if r.get(\"action\") == \"opened\":\n      opens[(host, d)] += 1\n  keys = set(cmds) | set(opens)\n  return [(h, d, cmds[(h, d)], opens[(h, d)]) for (h, d) in keys]\n"
+        }
+      },
+      "sshd": {
+        "multiline_1": {
+          "natural_language": "For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "failure_count",
+            "distinct_usernames_targeted"
+          ],
+          "precision": 0.8764,
+          "recall": 0.963,
+          "f1": 0.9176,
+          "n_result": 89,
+          "n_gt": 81,
+          "translation": "def b1(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _fail(r) and _ip_b(r) is not None:\n      g[_ip_b(r)].append(r)\n  return [(ip, len(rs), len({_user(r) for r in rs if _user(r) is not None}))\n          for ip, rs in g.items()]\n"
+        },
+        "multiline_2": {
+          "natural_language": "Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "peak_failures_in_5min"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 16,
+          "n_gt": 16,
+          "translation": "def b2(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _fail(r) and _ip_b(r) is not None:\n      g[_ip_b(r)].append(r.epoch)\n  out = []\n  for ip, epochs in g.items():\n    peak = eng.window_peak(epochs, 300 + 1e-6)\n    if peak >= 10:\n      out.append((ip, peak))\n  return out\n"
+        },
+        "multiline_3": {
+          "natural_language": "Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "distinct_usernames"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 10,
+          "n_gt": 10,
+          "translation": "def b3(eng):\n  g = defaultdict(set)\n  for r in eng.rows:\n    if _failb(r) and _ip_b(r) is not None and _user(r) is not None:\n      g[_ip_b(r)].add(_user(r))\n  return [(ip, len(us)) for ip, us in g.items() if len(us) >= 5]\n"
+        },
+        "multiline_4": {
+          "natural_language": "Find users who had successful SSH logins from two different source IP addresses within 60 seconds of each other. Assume year 2000 for timestamps. Return the username and the two IP addresses.",
+          "output_format": [
+            "username",
+            "first_ip",
+            "second_ip"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 18,
+          "n_gt": 18,
+          "translation": "def z4(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _ok(r) and _ip(r) is not None and _user(r) is not None and r.epoch:\n      g[_user(r)].append((r.epoch, _ip(r)))\n  out = set()\n  for user, evs in g.items():\n    evs.sort()\n    for i in range(len(evs)):\n      for j in range(i + 1, len(evs)):\n        if evs[j][0] - evs[i][0] > 60:\n          break\n        if evs[i][1] != evs[j][1]:\n          out.add((user, evs[i][1], evs[j][1]))\n  return list(out)\n"
+        },
+        "multiline_5": {
+          "natural_language": "For each host, count SSH session opens and session closes, and compute the number of unclosed sessions (opens minus closes).",
+          "output_format": [
+            "host",
+            "session_opens",
+            "session_closes",
+            "unclosed_sessions"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 123,
+          "n_gt": 123,
+          "translation": "def z5(eng):\n  opens = defaultdict(int)\n  closes = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if r.get(\"action\") == \"opened\":\n      opens[h] += 1\n    elif r.get(\"action\") == \"closed\":\n      closes[h] += 1\n  hosts = set(opens) | set(closes)\n  return [(h, opens[h], closes[h], opens[h] - closes[h]) for h in hosts]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each source IP, count the number of failed SSH authentication events that specifically targeted the root account. Exclude connection-level events where no authentication was attempted.",
+          "output_format": [
+            "source_ip",
+            "root_failure_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 45,
+          "n_gt": 45,
+          "translation": "def z6(eng):\n  g = defaultdict(int)\n  for r in eng.rows:\n    if _fail(r) and _ip(r) is not None and r.get(\"user_name\") == \"root\":\n      g[_ip(r)] += 1\n  return [(ip, c) for ip, c in g.items()]\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each host and username with successful SSH logins, count the total logins and the number of distinct key fingerprints used. Only count 'Accepted' login events, not session events.",
+          "output_format": [
+            "host",
+            "username",
+            "login_count",
+            "distinct_key_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 36,
+          "n_gt": 36,
+          "translation": "def z7(eng):\n  logins = defaultdict(int)\n  keys = defaultdict(set)\n  for r in eng.rows:\n    if _ok(r):\n      k = (r.get(\"log_host\"), _user(r))\n      logins[k] += 1\n      if r.get(\"key_fingerprint\") is not None:\n        keys[k].add(r.get(\"key_fingerprint\"))\n  return [(h, u, logins[(h, u)], len(keys[(h, u)])) for (h, u) in logins]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.",
+          "output_format": [
+            "host",
+            "distinct_attacker_ips",
+            "distinct_legitimate_ips"
+          ],
+          "precision": 0.9848,
+          "recall": 1.0,
+          "f1": 0.9924,
+          "n_result": 66,
+          "n_gt": 65,
+          "translation": "def b8(eng):\n  attackers = defaultdict(set)\n  legit = defaultdict(set)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if _failb(r) and _ip_b(r) is not None:\n      attackers[h].add(_ip_b(r))\n    if _ok(r) and _ip_b(r) is not None:\n      legit[h].add(_ip_b(r))\n  hosts = set(attackers) | set(legit)\n  return [(h, len(attackers[h]), len(legit[h])) for h in hosts]\n"
+        }
+      },
+      "audit": {
+        "multiline_1": {
+          "natural_language": "For each host, count SELinux AVC denial events and the number of distinct denied permissions.",
+          "output_format": [
+            "host",
+            "avc_denial_count",
+            "distinct_denied_permission_count"
+          ],
+          "precision": 0.9398,
+          "recall": 0.9452,
+          "f1": 0.9425,
+          "n_result": 349,
+          "n_gt": 347,
+          "translation": "def z1(eng):\n  cnt = defaultdict(int)\n  perms = defaultdict(set)\n  for r in eng.rows:\n    if (\"1400\" in _et(r) or \"AVC\" in _et(r)) and _denied(r):\n      h = r.get(\"log_host\")\n      cnt[h] += 1\n      if r.get(\"permission\") is not None:\n        perms[h].add(r.get(\"permission\"))\n  return [(h, cnt[h], len(perms[h])) for h in cnt]\n"
+        },
+        "multiline_2": {
+          "natural_language": "For each host, count SELinux policy load events and enforcing mode changes.",
+          "output_format": [
+            "host",
+            "policy_load_count",
+            "enforcing_change_count"
+          ],
+          "precision": 0.9944,
+          "recall": 0.9955,
+          "f1": 0.995,
+          "n_result": 892,
+          "n_gt": 891,
+          "translation": "def z2(eng):\n  loads = defaultdict(int)\n  enf = defaultdict(int)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    if r.get(\"event_action\") == \"loaded\":\n      loads[h] += 1\n    if r.get(\"enforcing_status\") is not None:\n      enf[h] += 1\n  hosts = set(loads) | set(enf)\n  return [(h, loads[h], enf[h]) for h in hosts]\n"
+        },
+        "multiline_3": {
+          "natural_language": "Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.",
+          "output_format": [
+            "host",
+            "boolean_name",
+            "disable_event_timestamp",
+            "enable_event_timestamp"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 14,
+          "n_gt": 14,
+          "translation": "def z3(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if r.get(\"boolean_name\") is not None and _etime(r) is not None:\n      g[(r.get(\"log_host\"), r.get(\"boolean_name\"))].append(\n          (_etime(r), r.get(\"boolean_value\")))\n  out = []\n  for (host, name), evs in g.items():\n    evs.sort()\n    # pair each disable (val 0) with the next enable (val 1) after it.\n    i = 0\n    while i < len(evs):\n      if evs[i][1] == \"0\":\n        for j in range(i + 1, len(evs)):\n          if evs[j][1] == \"1\":\n            out.append((host, name, evs[i][0], evs[j][0]))\n            i = j\n            break\n      i += 1\n  return out\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each host and PAM action, count total PAM events and how many of those events ended in failure.",
+          "output_format": [
+            "host",
+            "pam_action",
+            "pam_event_count",
+            "failed_pam_event_count"
+          ],
+          "precision": 0.9062,
+          "recall": 0.9355,
+          "f1": 0.9206,
+          "n_result": 96,
+          "n_gt": 93,
+          "translation": "def b4(eng):\n  total = defaultdict(int)\n  failed = defaultdict(int)\n  for r in eng.rows:\n    pa = r.get(\"pam_action\")\n    if pa is None:\n      continue\n    k = (_host(r), _pam(pa))\n    total[k] += 1\n    if r.get(\"outcome\") == \"failed\":\n      failed[k] += 1\n  return [(h, pa, total[(h, pa)], failed[(h, pa)]) for (h, pa) in total]\n"
+        },
+        "multiline_5": {
+          "natural_language": "For each source address, count failed SSH authentication attempts recorded by sshd.",
+          "output_format": [
+            "source_address",
+            "failed_ssh_attempt_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 23,
+          "n_gt": 23,
+          "translation": "def z5(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    if (r.get(\"executable_path\") == \"/usr/sbin/sshd\"\n        and r.get(\"outcome\") == \"failed\" and r.get(\"source_address\") is not None):\n      cnt[r.get(\"source_address\")] += 1\n  return [(ip, c) for ip, c in cnt.items()]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each systemd service unit, count unit start events and unit stop events.",
+          "output_format": [
+            "service_unit",
+            "unit_start_count",
+            "unit_stop_count"
+          ],
+          "precision": 0.8166,
+          "recall": 0.8539,
+          "f1": 0.8348,
+          "n_result": 229,
+          "n_gt": 219,
+          "translation": "def z6(eng):\n  starts = defaultdict(int)\n  stops = defaultdict(int)\n  for r in eng.rows:\n    su = r.get(\"service_unit\")\n    if su is None:\n      continue\n    et = _et(r)\n    if \"1130\" in et or \"SERVICE_START\" in et:\n      starts[su] += 1\n    if \"1131\" in et or \"SERVICE_STOP\" in et:\n      stops[su] += 1\n  units = set(starts) | set(stops)\n  return [(su, starts[su], stops[su]) for su in units]\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each host, count audit subsystem initialization events and audit daemon process ID set events.",
+          "output_format": [
+            "host",
+            "audit_initialized_count",
+            "audit_pid_set_count"
+          ],
+          "precision": 0.977,
+          "recall": 0.9508,
+          "f1": 0.9637,
+          "n_result": 1128,
+          "n_gt": 1159,
+          "translation": "def b7(eng):\n  init = defaultdict(int)\n  pidset = defaultdict(int)\n  for r in eng.rows:\n    h = _host(r)\n    if r.get(\"event_action\") == \"initialized\":\n      init[h] += 1\n    if r.get(\"audit_process_id\") is not None:\n      pidset[h] += 1\n  hosts = set(init) | set(pidset)\n  return [(h, init[h], pidset[h]) for h in hosts]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each executable path and signal number, count crash signal events.",
+          "output_format": [
+            "executable_path",
+            "signal_number",
+            "crash_event_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 8,
+          "n_gt": 8,
+          "translation": "def b8(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    et = _et(r)\n    if (\"1701\" in et or \"ANOM_ABEND\" in et) and r.get(\"executable_path\") is not None:\n      cnt[(r.get(\"executable_path\"), str(r.get(\"signal_number\")))] += 1\n  return [(ep, sig, c) for (ep, sig), c in cnt.items()]\n"
+        }
+      },
+      "puppet": {
+        "multiline_1": {
+          "natural_language": "For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.",
+          "output_format": [
+            "host",
+            "started_run_stream_count",
+            "finished_run_stream_count",
+            "completion_rate"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 25,
+          "n_gt": 25,
+          "translation": "def b1(eng):\n  \"\"\"Runs are per-process streams (distinct pids), not raw line counts.\"\"\"\n  applied = defaultdict(set)\n  finished = defaultdict(set)\n  for r in eng.rows:\n    if _pid(r) is None:\n      continue\n    h = r.get(\"log_host\")\n    if _c(r, \"Applying configuration version\"):\n      applied[h].add(_pid(r))\n    if _c(r, \"Finished catalog run\"):\n      finished[h].add(_pid(r))\n  out = []\n  for h, pids in applied.items():\n    s = len(pids)\n    f = len(pids & finished[h])\n    out.append((h, s, f, f / s if s else 0.0))\n  return out\n"
+        },
+        "multiline_2": {
+          "natural_language": "For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds, rounded to two decimal places.",
+          "output_format": [
+            "host",
+            "average_runtime_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 47,
+          "n_gt": 47,
+          "translation": "def z2(eng):\n  durs = defaultdict(list)\n  for r in eng.rows:\n    if _c(r, \"Finished catalog run\") and r.get(\"duration\") is not None:\n      try:\n        durs[r.get(\"log_host\")].append(float(str(r.get(\"duration\")).split()[0]))\n      except ValueError:\n        pass\n  return [(h, round(sum(v) / len(v), 2)) for h, v in durs.items() if v]\n"
+        },
+        "multiline_3": {
+          "natural_language": "Find Puppet agent processes where a node-definition fetch failure is later followed by use of a cached catalog. Return the host, process id, and the original syslog timestamp text from those two events.",
+          "output_format": [
+            "host",
+            "process_id",
+            "failure_timestamp",
+            "cached_catalog_timestamp"
+          ],
+          "precision": 0.9302,
+          "recall": 0.9302,
+          "f1": 0.9302,
+          "n_result": 43,
+          "n_gt": 43,
+          "translation": "def b3(eng):\n  \"\"\"node-definition fetch failure = 'Unable to fetch my node definition'.\"\"\"\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if _pid(r) is not None:\n      streams[(r.get(\"log_host\"), _pid(r))].append(r)\n  out = []\n  for (h, pid), rows in streams.items():\n    fail_ts = None\n    for r in rows:\n      if fail_ts is None and _c(r, \"Unable to fetch my node definition\"):\n        fail_ts = _ts(r)\n      elif fail_ts is not None and _c(r, \"Using cached catalog\"):\n        out.append((h, pid, fail_ts, _ts(r)))\n        fail_ts = None\n  return out\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each host that saw report-send failures or remote catalog retrieval failures, count both and return those two totals.",
+          "output_format": [
+            "host",
+            "report_failure_count",
+            "catalog_retrieval_failure_count"
+          ],
+          "precision": 0.9474,
+          "recall": 0.9474,
+          "f1": 0.9474,
+          "n_result": 19,
+          "n_gt": 19,
+          "translation": "def b4(eng):\n  \"\"\"Retrieval-failure lines are logged twice; dedup by (pid, timestamp).\"\"\"\n  rep = defaultdict(set)\n  ret = defaultdict(set)\n  for r in eng.rows:\n    h = r.get(\"log_host\")\n    key = (r.get(\"process_id\"), r.get(\"log_timestamp\"))\n    if _c(r, \"Could not send report\"):\n      rep[h].add(key)\n    if _c(r, \"Could not retrieve catalog\"):\n      ret[h].add(key)\n  hosts = set(rep) | set(ret)\n  return [(h, len(rep[h]), len(ret[h])) for h in hosts]\n"
+        },
+        "multiline_5": {
+          "natural_language": "For each Puppet module name appearing after '/Stage[main]/' in skipped resource identifiers, count how many resources were skipped because of failed dependencies.",
+          "output_format": [
+            "module_name",
+            "skipped_dependency_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 151,
+          "n_gt": 151,
+          "translation": "def z5(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    if not _c(r, \"Skipping because of failed dependencies\"):\n      continue\n    rid = r.get(\"resource_identifier\") or r.content\n    marker = \"/Stage[main]/\"\n    if marker in rid:\n      tail = rid.split(marker, 1)[1]\n      module = tail.split(\"/\", 1)[0]\n      if module:\n        cnt[module] += 1\n  return [(m, c) for m, c in cnt.items()]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.",
+          "output_format": [
+            "host",
+            "error_family",
+            "occurrence_count"
+          ],
+          "precision": 1.0,
+          "recall": 0.9474,
+          "f1": 0.973,
+          "n_result": 18,
+          "n_gt": 19,
+          "translation": "def b6(eng):\n  cnt = defaultdict(int)\n  for r in eng.rows:\n    c = r.content\n    for fam, keys in _FAM_BEST:\n      if any(k in c for k in keys):\n        cnt[(r.get(\"log_host\"), fam)] += 1\n        break  # one family per line, priority order\n  return [(h, fam, n) for (h, fam), n in cnt.items()]\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each host and Puppet agent process that logged refresh activity, count how many refreshes were scheduled and how many refreshes were triggered.",
+          "output_format": [
+            "host",
+            "process_id",
+            "scheduled_refresh_count",
+            "triggered_refresh_count"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 204,
+          "n_gt": 204,
+          "translation": "def z7(eng):\n  sched = defaultdict(int)\n  trig = defaultdict(int)\n  for r in eng.rows:\n    if _pid(r) is None:\n      continue\n    k = (r.get(\"log_host\"), _pid(r))\n    if _c(r, \"Scheduling refresh\"):\n      sched[k] += 1\n    if _c(r, \"Triggered 'refresh'\"):\n      trig[k] += 1\n  keys = set(sched) | set(trig)\n  return [(h, pid, sched[(h, pid)], trig[(h, pid)]) for (h, pid) in keys]\n"
+        },
+        "multiline_8": {
+          "natural_language": "Find Puppet agent processes where a remote catalog retrieval failure is followed by use of a cached catalog and then a report-send failure. Return the host, process id, and the original syslog timestamp text from those three events.",
+          "output_format": [
+            "host",
+            "process_id",
+            "catalog_failure_timestamp",
+            "cached_catalog_timestamp",
+            "report_failure_timestamp"
+          ],
+          "precision": 0.9643,
+          "recall": 0.9643,
+          "f1": 0.9643,
+          "n_result": 28,
+          "n_gt": 28,
+          "translation": "def z8(eng):\n  streams = defaultdict(list)\n  for r in eng.rows:\n    if _pid(r) is not None:\n      streams[(r.get(\"log_host\"), _pid(r))].append(r)\n  out = []\n  for (h, pid), rows in streams.items():\n    fail_ts = cached_ts = None\n    for r in rows:\n      if fail_ts is None and _c(r, \"Could not retrieve catalog\"):\n        fail_ts = _ts(r)\n      elif fail_ts is not None and cached_ts is None and _c(r, \"Using cached catalog\"):\n        cached_ts = _ts(r)\n      elif fail_ts is not None and cached_ts is not None and _c(r, \"Could not send report\"):\n        out.append((h, pid, fail_ts, cached_ts, _ts(r)))\n        fail_ts = cached_ts = None\n  return out\n"
+        }
+      },
+      "dhcp": {
+        "multiline_1": {
+          "natural_language": "Find transactions where time from DHCPREQUEST to DHCPACK exceeds 5 seconds. Return a list of pairs of transaction ids and duration.",
+          "output_format": [
+            "transaction_id",
+            "duration_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 0.7362,
+          "f1": 0.8481,
+          "n_result": 120,
+          "n_gt": 163,
+          "translation": "def z1(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    req = _ep(rows, \"DHCPREQUEST\")\n    if req is None:\n      continue\n    acks = [r.epoch for r in rows if _has(r, \"DHCPACK\") and r.epoch is not None\n            and r.epoch >= req]\n    if acks and min(acks) - req > 5:\n      out.append((t, min(acks) - req))\n  return out\n"
+        },
+        "multiline_2": {
+          "natural_language": "Find hosts issuing >100 DHCPREQUESTs within any 30-minute rolling window. Report the times of the first and last REQUEST of the first such window with the largest number of requests for each host.",
+          "output_format": [
+            "host",
+            "request_count_in_30min_window",
+            "window_start",
+            "window_end"
+          ],
+          "precision": 0.7,
+          "recall": 0.7,
+          "f1": 0.7,
+          "n_result": 30,
+          "n_gt": 30,
+          "translation": "def b2(eng):\n  g = defaultdict(list)\n  for r in eng.rows:\n    if _has(r, \"DHCPREQUEST\") and r.epoch is not None:\n      g[r.get(\"log_host\")].append(r.epoch)\n  out = []\n  for host, epochs in g.items():\n    epochs.sort()\n    best = None\n    j = 0\n    for i in range(len(epochs)):\n      while j < len(epochs) and epochs[j] - epochs[i] <= 1800:\n        j += 1\n      cnt = j - i\n      if best is None or cnt > best[0]:\n        best = (cnt, epochs[i], epochs[j - 1])\n    if best and best[0] > 100:\n      out.append((host, best[0], best[1] + _OFFSET, best[2] + _OFFSET))\n  return out\n"
+        },
+        "multiline_3": {
+          "natural_language": "Identify transaction_ids where a second DHCPREQUEST occurs before the DHCPACK for the first.",
+          "output_format": [
+            "transaction_id"
+          ],
+          "precision": 1.0,
+          "recall": 0.8603,
+          "f1": 0.9249,
+          "n_result": 505,
+          "n_gt": 587,
+          "translation": "def b3(eng):\n  return [t for t, rows in _by_txn(eng).items()\n          if _reqs_before_first_ack(rows) >= 2]\n"
+        },
+        "multiline_4": {
+          "natural_language": "For each client that sent at least one DHCPDISCOVER with an explicit transaction ID, count how many transaction IDs begin with DHCPDISCOVER, how many of those later contain DHCPACK, and the resulting completion rate.",
+          "output_format": [
+            "client",
+            "discover_started_transactions",
+            "completed_with_ack",
+            "completion_rate"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 196,
+          "n_gt": 196,
+          "translation": "def z4(eng):\n  disc = defaultdict(set)\n  ack = defaultdict(set)\n  for (host, t), rows in _by_client_txn(eng).items():\n    if any(_has(r, \"DHCPDISCOVER\") for r in rows):\n      disc[host].add(t)\n      if any(_has(r, \"DHCPACK\") for r in rows):\n        ack[host].add(t)\n  out = []\n  for host, ts in disc.items():\n    d = len(ts)\n    a = len(ack[host])\n    out.append((host, d, a, a / d if d else 0.0))\n  return out\n"
+        },
+        "multiline_5": {
+          "natural_language": "Considering only client/process streams that contain DHCPDISCOVER, DHCPOFFER, DHCPREQUEST, and DHCPACK, return for each client the average elapsed seconds between the DISCOVER and ACK.",
+          "output_format": [
+            "client",
+            "avg_discover_to_ack_seconds"
+          ],
+          "precision": 0.9174,
+          "recall": 0.9487,
+          "f1": 0.9328,
+          "n_result": 605,
+          "n_gt": 585,
+          "translation": "def b5(eng):\n  \"\"\"Per client, average DISCOVER->ACK seconds. Only streams containing all of\n  D/O/R/A qualify; deltas are paired per cycle (DISCOVER then next ACK) so that\n  merged multi-cycle streams don't produce nonsense min-to-min gaps.\"\"\"\n  per_client = defaultdict(list)\n  for (host, _), rows in _streams(eng).items():\n    types = set().union(*[_msgs(r) for r in rows]) if rows else set()\n    if not {\"DHCPDISCOVER\", \"DHCPOFFER\", \"DHCPREQUEST\", \"DHCPACK\"} <= types:\n      continue\n    rows = sorted(rows, key=lambda r: (r.epoch or 0, r.line_id))\n    pend = None\n    for r in rows:\n      if _has(r, \"DHCPDISCOVER\") and r.epoch is not None:\n        pend = r.epoch\n      elif _has(r, \"DHCPACK\") and r.epoch is not None and pend is not None:\n        per_client[host].append(r.epoch - pend)\n        pend = None\n  return [(h, round(sum(v) / len(v), 6)) for h, v in per_client.items() if v]\n"
+        },
+        "multiline_6": {
+          "natural_language": "For each DHCP server IP address, count the total number of OFFER messages sent. Then count how many of those OFFER messages resulted in a corresponding ACK within 60 seconds for the same transaction. Compute the conversion rate.",
+          "output_format": [
+            "server_ip",
+            "offer_total",
+            "offer_with_ack_60s",
+            "conversion_rate"
+          ],
+          "precision": 0.9502,
+          "recall": 0.9519,
+          "f1": 0.9511,
+          "n_result": 542,
+          "n_gt": 541,
+          "translation": "def z6(eng):\n  offers = defaultdict(list)\n  acks = defaultdict(list)\n  for r in eng.rows:\n    if r.epoch is None or r.get(\"source_ip\") is None:\n      continue\n    if _has(r, \"DHCPOFFER\"):\n      offers[r.get(\"source_ip\")].append(r.epoch)\n    if _has(r, \"DHCPACK\"):\n      acks[r.get(\"source_ip\")].append(r.epoch)\n  out = []\n  for ip, offs in offers.items():\n    ack_times = sorted(acks.get(ip, []))\n    matched = 0\n    for t in offs:\n      if any(t <= a <= t + 60 for a in ack_times):\n        matched += 1\n    total = len(offs)\n    out.append((ip, total, matched, matched / total if total else 0.0))\n  return out\n"
+        },
+        "multiline_7": {
+          "natural_language": "For each client, count transaction IDs that contain a DISCOVER and do not contain an ACK within 120 seconds. Only use transactions with an explicit transaction ID, return only clients with a nonzero count, and sort the results in descending order.",
+          "output_format": [
+            "client",
+            "discover_without_ack_120s_count"
+          ],
+          "precision": 1.0,
+          "recall": 0.9762,
+          "f1": 0.988,
+          "n_result": 41,
+          "n_gt": 42,
+          "translation": "def z7(eng):\n  cnt = defaultdict(int)\n  for (host, t), rows in _by_client_txn(eng).items():\n    d = _ep(rows, \"DHCPDISCOVER\")\n    if d is None:\n      continue\n    acks = [r.epoch for r in rows if _has(r, \"DHCPACK\") and r.epoch is not None]\n    if not any(d <= a <= d + 120 for a in acks):\n      cnt[host] += 1\n  return [(h, c) for h, c in cnt.items()]\n"
+        },
+        "multiline_8": {
+          "natural_language": "For each client and network interface, count the total number of DISCOVER and REQUEST messages observed. Output one row per client and interface.",
+          "output_format": [
+            "client",
+            "interface",
+            "discover_count",
+            "request_count"
+          ],
+          "precision": 0.9863,
+          "recall": 0.9863,
+          "f1": 0.9863,
+          "n_result": 1533,
+          "n_gt": 1533,
+          "translation": "def z8(eng):\n  disc = defaultdict(int)\n  req = defaultdict(int)\n  for r in eng.rows:\n    k = (r.get(\"log_host\") or \"(none)\", r.get(\"interface_name\"))\n    if r.get(\"interface_name\") is None:\n      continue\n    if _has(r, \"DHCPDISCOVER\"):\n      disc[k] += 1\n    if _has(r, \"DHCPREQUEST\"):\n      req[k] += 1\n  keys = set(disc) | set(req)\n  return [(h, i, disc[(h, i)], req[(h, i)]) for (h, i) in keys]\n"
+        },
+        "multiline_9": {
+          "natural_language": "For each client, calculate the average number of DHCP messages logged per transaction ID. Only count DHCP messages that specify a transaction ID. ",
+          "output_format": [
+            "client",
+            "avg_messages_per_transaction"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 342,
+          "n_gt": 342,
+          "translation": "def z9(eng):\n  msgs = defaultdict(int)\n  txns = defaultdict(set)\n  for r in eng.rows:\n    t = _txn(r)\n    if t is None:\n      continue\n    msgs[r.get(\"log_host\")] += 1\n    txns[r.get(\"log_host\")].add(t)\n  return [(h, round(msgs[h] / len(txns[h]), 6)) for h in msgs if txns[h]]\n"
+        },
+        "multiline_10": {
+          "natural_language": "For each hour 0 through 23, count unique transaction IDs whose DISCOVER occurred in that hour. Then count how many of those same transaction IDs have an ACK anywhere in the log. Use only explicit transaction IDs and return all 24 hours with the completion rate for each hour.",
+          "output_format": [
+            "hour_of_day",
+            "discover_transaction_count",
+            "completed_with_ack_count",
+            "completion_rate"
+          ],
+          "precision": 0.9583,
+          "recall": 0.9583,
+          "f1": 0.9583,
+          "n_result": 24,
+          "n_gt": 24,
+          "translation": "def b10(eng):\n  \"\"\"A transaction is counted in every hour in which it has a DISCOVER (not just\n  its first). Completion = that txn has an ACK anywhere.\"\"\"\n  hour_txns = defaultdict(set)\n  has_ack = {}\n  for t, rows in _by_txn(eng).items():\n    hrs = {r.dt.hour for r in rows if _has(r, \"DHCPDISCOVER\") and r.dt is not None}\n    if not hrs:\n      continue\n    has_ack[t] = any(_has(r, \"DHCPACK\") for r in rows)\n    for h in hrs:\n      hour_txns[h].add(t)\n  out = []\n  for h in range(24):\n    txns = hour_txns[h]\n    d = len(txns)\n    a = sum(1 for t in txns if has_ack[t])\n    out.append((h, d, a, a / d if d else 0.0))\n  return out\n"
+        },
+        "multiline_11": {
+          "natural_language": "Return the 1-indexed line number and hostname for each DHCPOFFER line where no DHCPDISCOVER from the same hostname/process stream occurred in the previous 30 seconds. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream.",
+          "output_format": [
+            "line_id",
+            "client"
+          ],
+          "precision": 0.9412,
+          "recall": 0.6957,
+          "f1": 0.8,
+          "n_result": 17,
+          "n_gt": 23,
+          "translation": "def b11(eng):\n  out = []\n  for rows in _streams(eng).values():\n    disc = [r.epoch for r in rows\n            if _has(r, \"DHCPDISCOVER\") and r.epoch is not None]\n    for r in rows:\n      if _has(r, \"DHCPOFFER\") and r.epoch is not None:\n        if not any(r.epoch - 30 <= d <= r.epoch for d in disc):\n          out.append((r.line_id, r.get(\"log_host\")))\n  return out\n"
+        },
+        "multiline_12": {
+          "natural_language": "Identify ACK messages where no matching REQUEST from the same transaction occurred within the previous 30 seconds.",
+          "output_format": [
+            "line_id",
+            "transaction_id"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 0,
+          "n_gt": 0,
+          "translation": "def z12(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    reqs = [r.epoch for r in rows if _has(r, \"DHCPREQUEST\") and r.epoch is not None]\n    for r in rows:\n      if _has(r, \"DHCPACK\") and r.epoch is not None:\n        if not any(r.epoch - 30 <= q <= r.epoch for q in reqs):\n          out.append((r.line_id, t))\n  return out\n"
+        },
+        "multiline_13": {
+          "natural_language": "Identify invalid DHCP cycle transitions by hostname and transaction ID. If a DHCP message lacks a transaction ID, infer it from the latest transaction ID in the same process stream. Valid repeated cycles are DHCPDISCOVER -> DHCPOFFER -> DHCPREQUEST -> DHCPACK and DHCPREQUEST -> DHCPACK. Treat incomplete trailing sequences as allowed; only explicit bad transitions are violations.",
+          "output_format": [
+            "client",
+            "transaction_id"
+          ],
+          "precision": 0.9945,
+          "recall": 0.9979,
+          "f1": 0.9962,
+          "n_result": 5869,
+          "n_gt": 5849,
+          "translation": "def b13(eng):\n  \"\"\"Invalid DORA transitions per (client, txn). Messages with no txn inherit\n  the latest explicit txn in the same process stream. Only D/O/R/A messages are\n  considered; any consecutive pair outside the valid cycles is a violation.\"\"\"\n  seqs = defaultdict(list)\n  for (host, _), rows in _streams(eng).items():\n    rows = sorted(rows, key=lambda r: (r.epoch or 0, r.line_id))\n    last_txn = None\n    for r in rows:\n      dora = sorted((m for m in _msgs(r) if m in _DORA_RANK),\n                    key=lambda m: _DORA_RANK[m])\n      t = _txn(r)\n      if t is not None:\n        last_txn = t\n      txn = t if t is not None else last_txn\n      if txn is None:\n        continue\n      for m in dora:\n        seqs[(host, txn)].append(m)\n  out = []\n  for (host, txn), seq in seqs.items():\n    for a, b in zip(seq, seq[1:]):\n      if (a, b) not in _ALLOWED:\n        out.append((host, txn))\n        break\n  return out\n"
+        },
+        "multiline_14": {
+          "natural_language": "Identify transactions where two or more REQUEST messages occur before the first ACK.",
+          "output_format": [
+            "transaction_id"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 505,
+          "n_gt": 505,
+          "translation": "def b14(eng):\n  return [t for t, rows in _by_txn(eng).items()\n          if _reqs_before_first_ack(rows) >= 2]\n"
+        },
+        "multiline_15": {
+          "natural_language": "For completed transactions, calculate the time difference in seconds between the REQUEST and the ACK. List transactions where this latency exceeds 5 seconds.",
+          "output_format": [
+            "transaction_id",
+            "request_to_ack_latency_seconds"
+          ],
+          "precision": 1.0,
+          "recall": 0.7362,
+          "f1": 0.8481,
+          "n_result": 120,
+          "n_gt": 163,
+          "translation": "def z15(eng):\n  out = []\n  for t, rows in _by_txn(eng).items():\n    req = _ep(rows, \"DHCPREQUEST\")\n    ack = _ep(rows, \"DHCPACK\")\n    if req is not None and ack is not None and ack - req > 5:\n      out.append((t, ack - req))\n  return out\n"
+        },
+        "multiline_16": {
+          "natural_language": "Identify transactions (same client and transaction ID) where two or more DISCOVER messages occur within 60 seconds and no OFFER is present.",
+          "output_format": [
+            "client",
+            "transaction_id"
+          ],
+          "precision": 0.9681,
+          "recall": 1.0,
+          "f1": 0.9838,
+          "n_result": 4421,
+          "n_gt": 4280,
+          "translation": "def z16(eng):\n  out = []\n  for (host, t), rows in _by_client_txn(eng).items():\n    if any(_has(r, \"DHCPOFFER\") for r in rows):\n      continue\n    ds = sorted(r.epoch for r in rows if _has(r, \"DHCPDISCOVER\") and r.epoch is not None)\n    if len(ds) < 2:\n      continue\n    if any(ds[i + 1] - ds[i] <= 60 for i in range(len(ds) - 1)):\n      out.append((host, t))\n  return out\n"
+        },
+        "multiline_17": {
+          "natural_language": "Identify DHCP exchanges where the client received at least two OFFERs from different servers before getting an ACK. Return the client hostname, process id, transaction id, timestamp of the event, list of server ips, and ACKed server for each instance.",
+          "output_format": [
+            "client",
+            "process_id",
+            "transaction_id",
+            "ack_timestamp",
+            "offer_server_ips",
+            "ack_server_ip"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 0,
+          "n_gt": 0,
+          "translation": "def z17(eng):\n  out = []\n  for (host, t), rows in _by_client_txn(eng).items():\n    ack = _ep(rows, \"DHCPACK\")\n    if ack is None:\n      continue\n    servers = {r.get(\"source_ip\") for r in rows\n               if _has(r, \"DHCPOFFER\") and r.epoch is not None and r.epoch < ack\n               and r.get(\"source_ip\") is not None}\n    if len(servers) >= 2:\n      pid = rows[0].get(\"process_id\")\n      out.append((host, pid, t, ack, tuple(sorted(servers)), rows[0].get(\"source_ip\")))\n  return out\n"
+        },
+        "multiline_18": {
+          "natural_language": "Are there any cases where two different clients were assigned the same IP address at exactly the same timestamp?",
+          "output_format": [
+            "assigned_ip",
+            "timestamp",
+            "clients"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "n_result": 0,
+          "n_gt": 0,
+          "translation": "def b18(eng):\n  g = defaultdict(set)\n  for r in eng.rows:\n    ip = r.get(\"assigned_ip\")\n    if ip is not None and r.epoch is not None:\n      g[(ip, r.epoch)].add(r.get(\"log_host\"))\n  out = []\n  for (ip, ts), clients in g.items():\n    if len(clients) >= 2:\n      out.append((ip, ts + _OFFSET, tuple(sorted(clients))))\n  return out\n"
+        },
+        "multiline_19": {
+          "natural_language": "Are there any transactions (same client and transaction ID) where DISCOVER, OFFER, REQUEST, and ACK all occurred at exactly the same timestamp?",
+          "output_format": [
+            "client",
+            "transaction_id",
+            "timestamp"
+          ],
+          "precision": 0.5906,
+          "recall": 0.5922,
+          "f1": 0.5914,
+          "n_result": 745,
+          "n_gt": 743,
+          "translation": "def b19(eng):\n  \"\"\"A single timestamp carrying a full cycle. Group rows by (client, epoch);\n  require an OFFER present, and a txn at that epoch showing D/R/A.\"\"\"\n  g = defaultdict(list)\n  for r in eng.rows:\n    if r.epoch is not None:\n      g[(r.get(\"log_host\"), r.epoch)].append(r)\n  out = []\n  for (host, ts), rows in g.items():\n    if not any(_has(r, \"DHCPOFFER\") for r in rows):\n      continue\n    per_txn = defaultdict(set)\n    for r in rows:\n      t = _txn(r)\n      if t is not None:\n        per_txn[t] |= _msgs(r)\n    for t, types in per_txn.items():\n      if {\"DHCPDISCOVER\", \"DHCPREQUEST\", \"DHCPACK\"} <= types:\n        out.append((host, t, ts + _OFFSET))\n  return out\n"
+        },
+        "multiline_20": {
+          "natural_language": "Associate each assigned IP with the MAC address reported for that client/process stream, and return the timestamp, client MAC, and assigned IP.",
+          "output_format": [
+            "timestamp",
+            "client_mac",
+            "assigned_ip"
+          ],
+          "precision": 0.3865,
+          "recall": 0.5394,
+          "f1": 0.4503,
+          "n_result": 20383,
+          "n_gt": 14605,
+          "translation": "def b20(eng):\n  \"\"\"MAC lives on Listening/Sending lines; associate each assigned_ip with the\n  most recent MAC seen earlier in the same process stream (per-cycle), not a\n  single global last-MAC which mixes clients sharing a server pid.\"\"\"\n  out = set()\n  for (host, _), rows in _streams(eng).items():\n    rows = sorted(rows, key=lambda r: (r.epoch or 0, r.line_id))\n    cur_mac = None\n    for r in rows:\n      mac = r.get(\"interface_mac\")\n      if mac is not None:\n        cur_mac = mac\n      ip = r.get(\"assigned_ip\")\n      if ip is not None and r.epoch is not None and cur_mac is not None:\n        out.add((r.epoch + _OFFSET, cur_mac, ip))\n  return list(out)\n"
+        },
+        "multiline_21": {
+          "natural_language": "Find DHCP renewals where a DHCPREQUEST occurs within 25% of the stated renewal time after the lease was bound in the same host/process stream. Return the hostname, assigned IP, and elapsed seconds from the bound event to the REQUEST.",
+          "output_format": [
+            "hostname",
+            "assigned_ip",
+            "lease_renewal_time_seconds"
+          ],
+          "precision": 0.8521,
+          "recall": 0.7594,
+          "f1": 0.8031,
+          "n_result": 3882,
+          "n_gt": 4356,
+          "translation": "def b21(eng):\n  \"\"\"Early renewal: the first REQUEST following a bound within 25% of the lease\n  time. One row per bound; a new DISCOVER starts a fresh cycle (not a renewal).\"\"\"\n  out = set()\n  for (host, _), rows in _streams(eng).items():\n    rows = sorted(rows, key=lambda r: (r.epoch or 0, r.line_id))\n    pending = None\n    for r in rows:\n      if r.get(\"action\") == \"bound\" and r.get(\"lease_renewal_duration\") is not None:\n        try:\n          T = float(str(r.get(\"lease_renewal_duration\")).split()[0])\n        except (TypeError, ValueError):\n          pending = None\n          continue\n        pending = (r.epoch, r.get(\"assigned_ip\"), T) if r.epoch is not None else None\n      elif _has(r, \"DHCPDISCOVER\"):\n        pending = None\n      elif _has(r, \"DHCPREQUEST\") and r.epoch is not None and pending:\n        bep, ip, T = pending\n        if bep < r.epoch <= bep + 0.25 * T:\n          out.add((host, ip, r.epoch - bep))\n        elif r.epoch > bep + 0.25 * T:\n          pending = None\n  return list(out)\n"
+        }
+      }
+    }
+  }
+}

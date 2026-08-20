@@ -1,0 +1,277 @@
+# Evaluation report generated 20260429-142704
+# Source JSON: queries/puppet_complex.json
+# Log file input: data/logs/puppet
+# Log file resolved: data/logs/puppet
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/puppet.json
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.
+  requested output format=host,started_run_stream_count,finished_run_stream_count,completion_rate
+  requested output data type=string,integer,integer,float
+  command: awk '
+/puppet-agent\[[0-9]+\]: (Applying configuration version|Finished catalog run in|Applied catalog in)/ {
+    for (i=2; i<=NF; i++) {
+        if ($i ~ /^puppet-agent\[[0-9]+\]:$/) {
+            host = $(i-1)
+            pid = $i
+            sub(/^puppet-agent\[/, "", pid)
+            sub(/\]:$/, "", pid)
+            
+            if ($0 ~ /Applying configuration version/) {
+                s[host, pid] = 1
+                ts[host]++
+            } else if ($0 ~ /Finished catalog run in/ || $0 ~ /Applied catalog in/) {
+                if (s[host, pid] == 1) {
+                    tf[host]++
+                    s[host, pid] = 0
+                }
+            }
+            break
+        }
+    }
+}
+END {
+    for (h in ts) {
+        started = ts[h]
+        finished = tf[h] + 0
+        if (started > 0) {
+            printf "%s %d %d %.6f\n", h, started, finished, finished / started
+        }
+    }
+}
+' data/logs/puppet
+  precision=0.1600 recall=0.1600 f1=0.1600 TP=4 FP=21 FN=21 returned=25 must=25
+  may_precision=0.1600 may_recall=0.1600 may_f1=0.1600 may_TP=4 may_FP=21 may_FN=21 may=25
+  retries=0
+  input_tokens=46309 output_tokens=322
+  elapsed_seconds=60.17
+
+ID: multiline_2 | type: select | query: For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds, rounded to two decimal places.
+  requested output format=host,average_runtime_seconds
+  requested output data type=string,float
+  command: awk '(/Finished catalog run in/ || /Applied catalog in/) { for (i=1; i<=NF; i++) { if ($i ~ /^puppet(-agent)?(\[[0-9]+\])?:$/) { host = $(i-1); if ($(i+1) == "Finished" && $(i+2) == "catalog" && $(i+3) == "run" && $(i+4) == "in") { sum[host] += $(i+5); count[host]++; } else if ($(i+1) == "Applied" && $(i+2) == "catalog" && $(i+3) == "in") { sum[host] += $(i+4); count[host]++; } break; } } } END { for (h in sum) { printf "%s %.2f\n", h, sum[h]/count[h]; } }' data/logs/puppet
+  precision=0.8367 recall=0.8723 f1=0.8542 TP=41 FP=8 FN=6 returned=49 must=47
+  may_precision=0.8367 may_recall=0.8723 may_f1=0.8542 may_TP=41 may_FP=8 may_FN=6 may=47
+  retries=0
+  input_tokens=46318 output_tokens=230
+  elapsed_seconds=44.11
+
+ID: multiline_3 | type: select | query: Find Puppet agent processes where a node-definition fetch failure is later followed by use of a cached catalog. Return the host, process id, and the original syslog timestamp text from those two events.
+  requested output format=host,process_id,failure_timestamp,cached_catalog_timestamp
+  requested output data type=string,integer,string,string
+  command: awk '
+BEGIN {
+    fail_str = "Unable to fetch my node definition"
+    cache_str = "Using cached catalog"
+}
+index($0, fail_str) || index($0, cache_str) {
+    if (match($0, /^[A-Z][a-z]{2} +[0-9]+ +[0-9]{2}:[0-9]{2}:[0-9]{2}/) || match($0, /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[^ ]*/)) {
+        ts = substr($0, RSTART, RLENGTH)
+        post_ts = substr($0, RSTART + RLENGTH)
+        sub(/^ +/, "", post_ts)
+        split(post_ts, parts, " ")
+        host = parts[1]
+        if (index(parts[2], "puppet-agent[") == 1) {
+            match(parts[2], /[0-9]+/)
+            pid = substr(parts[2], RSTART, RLENGTH)
+            key = host ":" pid
+            
+            if (index($0, fail_str)) {
+                fail_ts[key] = ts
+            } else if (index($0, cache_str)) {
+                if (key in fail_ts) {
+                    print host, pid, fail_ts[key], ts
+                    delete fail_ts[key]
+                }
+            }
+        }
+    }
+}' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=43 FP=0 FN=0 returned=43 must=43
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=43 may_FP=0 may_FN=0 may=43
+  retries=0
+  input_tokens=46335 output_tokens=392
+  elapsed_seconds=71.61
+
+ID: multiline_4 | type: select | query: For each host that saw report-send failures or remote catalog retrieval failures, count both and return those two totals.
+  requested output format=host,report_failure_count,catalog_retrieval_failure_count
+  requested output data type=string,integer,integer
+  command: awk '/Could not send report:/ { r[$4]++; h[$4] = 1 } /Could not retrieve catalog from remote server:/ { c[$4]++; h[$4] = 1 } END { for (host in h) print host, r[host] + 0, c[host] + 0 }' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=19 FP=0 FN=0 returned=19 must=19
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=19 may_FP=0 may_FN=0 may=19
+  retries=0
+  input_tokens=46291 output_tokens=94
+  elapsed_seconds=32.77
+
+ID: multiline_5 | type: select | query: For each Puppet module name appearing after '/Stage[main]/' in skipped resource identifiers, count how many resources were skipped because of failed dependencies.
+  requested output format=module_name,skipped_dependency_count
+  requested output data type=string,integer
+  command: awk '
+# Match lines indicating a resource was skipped due to failed dependencies
+/Skipping because of failed dependencies/ {
+    # Find the position of "/Stage[main]/"
+    idx = index($0, "/Stage[main]/")
+    if (idx > 0) {
+        # Extract the string after "/Stage[main]/"
+        rest = substr($0, idx + 13)
+        # Find the next slash which ends the module name
+        slash_idx = index(rest, "/")
+        if (slash_idx > 0) {
+            # Extract the module name and increment its count
+            mod = substr(rest, 1, slash_idx - 1)
+            count[mod]++
+        }
+    }
+}
+# Print the results: module_name skipped_dependency_count
+END {
+    for (m in count) {
+        print m, count[m]
+    }
+}' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=151 FP=0 FN=0 returned=151 must=151
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=151 may_FP=0 may_FN=0 may=151
+  retries=0
+  input_tokens=46277 output_tokens=255
+  elapsed_seconds=35.66
+
+ID: multiline_6 | type: select | query: For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.
+  requested output format=host,error_family,occurrence_count
+  requested output data type=string,string,integer
+  command: awk '
+{
+    h=$4
+    if (/certificate verify failed/) c[h, "certificate_verify_failed"]++
+    if (/getaddrinfo|Couldn.t resolve host|no address for/) c[h, "getaddrinfo"]++
+    if (/Network is unreachable|No route to host/) c[h, "network_unreachable"]++
+    if (/command not found|Command .* is missing|Could not find command|No such file or directory -/) c[h, "command_not_found"]++
+    if (/Command exceeded timeout|Connection timed out|execution expired|Timeout on/) c[h, "timeout"]++
+    if (/[Ee]rror [Dd]ownloading [Pp]ackages|No more mirrors to try|No matching Packages to list|Cannot retrieve repository metadata/) c[h, "error_downloading_packages"]++
+    if (/No child processes/) c[h, "no_child_processes"]++
+}
+END {
+    for (k in c) {
+        split(k, a, SUBSEP)
+        print a[1], a[2], c[k]
+    }
+}' data/logs/puppet
+  precision=0.3030 recall=0.5263 f1=0.3846 TP=10 FP=23 FN=9 returned=33 must=19
+  may_precision=0.3030 may_recall=0.5263 may_f1=0.3846 may_TP=10 may_FP=23 may_FN=9 may=19
+  retries=0
+  input_tokens=46318 output_tokens=290
+  elapsed_seconds=36.93
+
+ID: multiline_7 | type: select | query: For each host and Puppet agent process that logged refresh activity, count how many refreshes were scheduled and how many refreshes were triggered.
+  requested output format=host,process_id,scheduled_refresh_count,triggered_refresh_count
+  requested output data type=string,integer,integer,integer
+  command: awk '
+/Scheduling refresh of|Triggered .refresh. from|Unscheduling refresh on|Failed to call refresh/ {
+    # Find the host and process ID dynamically to handle any potential syslog prefix variation
+    host = ""
+    pid = ""
+    for (i=1; i<=NF; i++) {
+        if ($i ~ /^puppet-agent\[[0-9]+\]:$/) {
+            host = $(i-1)
+            pid = $i
+            sub(/^puppet-agent\[/, "", pid)
+            sub(/\]:$/, "", pid)
+            break
+        }
+    }
+    
+    # If we successfully parsed a host and pid, record the activity
+    if (host != "" && pid != "") {
+        key = host SUBSEP pid
+        seen[key] = 1
+        
+        if ($0 ~ /Scheduling refresh of/) {
+            sched[key]++
+        } else if ($0 ~ /Triggered .refresh. from/) {
+            trig[key]++
+        }
+    }
+}
+END {
+    # Print the aggregate counts for each observed host and process_id
+    for (key in seen) {
+        split(key, a, SUBSEP)
+        print a[1], a[2], sched[key]+0, trig[key]+0
+    }
+}' data/logs/puppet
+  precision=0.9533 recall=1.0000 f1=0.9761 TP=204 FP=10 FN=0 returned=214 must=204
+  may_precision=0.9533 may_recall=1.0000 may_f1=0.9761 may_TP=204 may_FP=10 may_FN=0 may=204
+  retries=0
+  input_tokens=46299 output_tokens=344
+  elapsed_seconds=61.79
+
+ID: multiline_8 | type: select | query: Find Puppet agent processes where a remote catalog retrieval failure is followed by use of a cached catalog and then a report-send failure. Return the host, process id, and the original syslog timestamp text from those three events.
+  requested output format=host,process_id,catalog_failure_timestamp,cached_catalog_timestamp,report_failure_timestamp
+  requested output data type=string,integer,string,string,string
+  command: awk '
+{
+    # Match standard syslog timestamp at the beginning of the line
+    if (match($0, /^[A-Z][a-z]{2} +[0-9]+ +[0-9]{2}:[0-9]{2}:[0-9]{2}/)) {
+        if (RSTART == 1) {
+            # Extract the exact syslog timestamp text
+            ts = substr($0, RSTART, RLENGTH)
+            
+            # Field 4 is the host, Field 5 is the process/tag
+            host = $4
+            proc = $5
+            
+            # We only care about puppet or puppet-agent processes that include a PID
+            if (proc ~ /^puppet(-agent)?\[[0-9]+\]:/) {
+                # Extract PID from the process string
+                match(proc, /[0-9]+/)
+                pid = substr(proc, RSTART, RLENGTH)
+                key = host SUBSEP pid
+                
+                # State 0 -> State 1: Remote catalog retrieval failure
+                if ($0 ~ /Could not retrieve catalog from remote server/) {
+                    t1[key] = ts
+                    state[key] = 1
+                }
+                # State 1 -> State 2: Using cached catalog
+                else if (state[key] == 1 && $0 ~ /Using cached catalog/) {
+                    t2[key] = ts
+                    state[key] = 2
+                }
+                # State 2 -> Print: Report-send failure
+                else if ($0 ~ /Could not send report/) {
+                    if (state[key] == 2) {
+                        print host, pid, t1[key], t2[key], ts
+                    }
+                    # Reset state after report failure (run ends)
+                    state[key] = 0
+                }
+                # Reset state if a new run begins or completes successfully
+                else if ($0 ~ /Retrieving plugin|Loading facts|Starting Puppet client|Finished catalog run|Applied catalog in/) {
+                    state[key] = 0
+                }
+            }
+        }
+    }
+}
+' data/logs/puppet
+  precision=1.0000 recall=0.6786 f1=0.8085 TP=19 FP=0 FN=9 returned=19 must=28
+  may_precision=1.0000 may_recall=0.6786 may_f1=0.8085 may_TP=19 may_FP=0 may_FN=9 may=28
+  retries=0
+  input_tokens=46360 output_tokens=525
+  elapsed_seconds=104.82
+
+# Macro Averages (where/select queries)
+# precision=0.7816 recall=0.7797 f1=0.7729
+# may_precision=0.7816 may_recall=0.7797 may_f1=0.7729
+# retries_total=0 retries_avg=0.00
+# total_input_tokens=370507 total_output_tokens=2452
+# total_elapsed=447.86s avg_elapsed=55.98s
+# Worst 5 queries by f1
+# 1. multiline_1 | type: select | f1=0.1600 | query: For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.
+# 2. multiline_6 | type: select | f1=0.3846 | query: For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.
+# 3. multiline_8 | type: select | f1=0.8085 | query: Find Puppet agent processes where a remote catalog retrieval failure is followed by use of a cached catalog and then a report-send failure. Return the host, process id, and the original syslog timestamp text from those three events.
+# 4. multiline_2 | type: select | f1=0.8542 | query: For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds, rounded to two decimal places.
+# 5. multiline_7 | type: select | f1=0.9761 | query: For each host and Puppet agent process that logged refresh activity, count how many refreshes were scheduled and how many refreshes were triggered.

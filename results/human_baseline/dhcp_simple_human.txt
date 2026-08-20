@@ -1,0 +1,135 @@
+# Human baseline report for dhcp_simple
+# Baseline scripts: human_baselines/dhcp_simple
+# Log file: data/logs/dhcp
+# Queries evaluated: 32
+
+ID: dhcp_query_1 | type: where | query: Return lines assigning an IP to host laphroaig
+  script: human_baselines/dhcp_simple/dhcp_query_1.sh
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=23 FN=23 returned=23 must=23
+
+ID: dhcp_query_2 | type: where | query: Return log lines reporting DHCP server IP addresses that are not broadcast addresses
+  script: human_baselines/dhcp_simple/dhcp_query_2.sh
+  precision=0.9421 recall=0.2759 f1=0.4268 TP=42130 FP=2588 FN=110560 returned=44718 must=152690
+
+ID: dhcp_query_3 | type: where | query: Return all log lines for transaction ID 0x6520bf0e
+  script: human_baselines/dhcp_simple/dhcp_query_3.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4100 FP=0 FN=0 returned=4100 must=4100
+
+ID: dhcp_query_4 | type: where | query: Get all lines reporting MAC addresses for host laphroaig
+  script: human_baselines/dhcp_simple/dhcp_query_4.sh
+  precision=0.1643 recall=1.0000 f1=0.2822 TP=46 FP=234 FN=0 returned=280 must=46
+
+ID: dhcp_query_5 | type: where | query: List all log lines reporting IP assignments with lease durations over a day
+  script: human_baselines/dhcp_simple/dhcp_query_5.sh
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=2998 returned=0 must=2998
+
+ID: dhcp_query_6 | type: where | query: List all log lines reporting DHCP destination IPs running on non standard ports
+  script: human_baselines/dhcp_simple/dhcp_query_6.sh
+  precision=0.0692 recall=1.0000 f1=0.1295 TP=9 FP=121 FN=0 returned=130 must=9
+
+ID: dhcp_query_7 | type: where | query: List all log lines reporting hosts using client version 3.0.1
+  script: human_baselines/dhcp_simple/dhcp_query_7.sh
+  precision=0.0194 recall=1.0000 f1=0.0380 TP=5 FP=253 FN=0 returned=258 must=5
+
+ID: dhcp_query_8 | type: where | query: List all log lines reporting DHCPDISCOVER messages
+  script: human_baselines/dhcp_simple/dhcp_query_8.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=37738 FP=0 FN=0 returned=37738 must=37738
+
+ID: dhcp_query_9 | type: where | query: List all log lines reporting XMT Renew messages
+  script: human_baselines/dhcp_simple/dhcp_query_9.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+
+ID: dhcp_query_10 | type: where | query: Return logs reporting bad IP checksums
+  script: human_baselines/dhcp_simple/dhcp_query_10.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=8 FP=0 FN=0 returned=8 must=8
+
+ID: dhcp_select_1 | type: select | query: Return DHCP server IP addresses that are not broadcast addresses
+  script: human_baselines/dhcp_simple/dhcp_select_1.py
+  precision=1.0000 recall=0.9288 f1=0.9631 TP=783 FP=0 FN=60 returned=783 must=843
+
+ID: dhcp_select_2 | type: select | query: Find the MAC addresses reported for host laphroaig
+  script: human_baselines/dhcp_simple/dhcp_select_2.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+
+ID: dhcp_select_3 | type: select | query: Return all IPs that were assigned with lease durations over a day
+  script: human_baselines/dhcp_simple/dhcp_select_3.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=337 returned=0 must=337
+
+ID: dhcp_select_4 | type: select | query: Find the unique DHCP destination IPs used with non-standard ports
+  script: human_baselines/dhcp_simple/dhcp_select_4.py
+  precision=1.0000 recall=0.6667 f1=0.8000 TP=2 FP=0 FN=1 returned=2 must=3
+
+ID: dhcp_select_5 | type: select | query: Find the hosts using DHCP client version 3.0.1
+  script: human_baselines/dhcp_simple/dhcp_select_5.py
+  precision=0.6667 recall=1.0000 f1=0.8000 TP=2 FP=1 FN=0 returned=3 must=2
+
+ID: dhcp_select_6 | type: select | query: List all hosts which sent a DHCPDISCOVER messages
+  script: human_baselines/dhcp_simple/dhcp_select_6.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=647 FP=0 FN=0 returned=647 must=647
+
+ID: dhcp_select_7 | type: select | query: Find the unique hosts reporting an XMT Renew message
+  script: human_baselines/dhcp_simple/dhcp_select_7.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+
+ID: simple_1 | type: where | query: Show all DHCPACK messages
+  script: human_baselines/dhcp_simple/simple_1.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=35522 FP=0 FN=0 returned=35522 must=35522
+
+ID: simple_2 | type: where | query: Find logs from interface eth0
+  script: human_baselines/dhcp_simple/simple_2.sh
+  precision=0.9971 recall=1.0000 f1=0.9985 TP=69491 FP=203 FN=0 returned=69694 must=69491
+
+ID: simple_3 | type: where | query: Show messages from host localhost
+  script: human_baselines/dhcp_simple/simple_3.sh
+  precision=0.9935 recall=1.0000 f1=0.9967 TP=96724 FP=634 FN=0 returned=97358 must=96724
+
+ID: complex_1 | type: where | query: Find DHCPREQUEST messages on interface eth0 from host localhost with port 67
+  script: human_baselines/dhcp_simple/complex_1.sh
+  precision=0.9997 recall=1.0000 f1=0.9998 TP=11698 FP=4 FN=0 returned=11702 must=11698
+
+ID: complex_2 | type: where | query: Show DHCPOFFER or DHCPACK messages from server 192.168.1.1
+  script: human_baselines/dhcp_simple/complex_2.sh
+  precision=0.8324 recall=1.0000 f1=0.9086 TP=5490 FP=1105 FN=0 returned=6595 must=5490
+
+ID: complex_3 | type: where | query: Find all DHCP messages with transaction ID starting with 0x7
+  script: human_baselines/dhcp_simple/complex_3.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6883 FP=0 FN=0 returned=6883 must=6883
+
+ID: vague_1 | type: where | query: Show me DHCP errors
+  script: human_baselines/dhcp_simple/vague_1.sh
+  precision=0.9867 recall=0.0995 f1=0.1808 TP=2228 FP=30 FN=20166 returned=2258 must=22394
+
+ID: vague_2 | type: where | query: Find network problems
+  script: human_baselines/dhcp_simple/vague_2.sh
+  precision=0.9950 recall=0.5444 f1=0.7037 TP=10914 FP=55 FN=9135 returned=10969 must=20049
+
+ID: numerical_1 | type: where | query: Find entries with process ID greater than 5000
+  script: human_baselines/dhcp_simple/numerical_1.sh
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=104648 returned=0 must=104648
+
+ID: numerical_2 | type: where | query: Show logs with retry interval less than 5
+  script: human_baselines/dhcp_simple/numerical_2.sh
+  precision=1.0000 recall=0.4795 f1=0.6482 TP=2604 FP=0 FN=2827 returned=2604 must=5431
+
+ID: time_1 | type: where | query: Show logs from June 18
+  script: human_baselines/dhcp_simple/time_1.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1495 FP=0 FN=0 returned=1495 must=1495
+
+ID: time_2 | type: where | query: Find messages from September
+  script: human_baselines/dhcp_simple/time_2.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=57756 FP=0 FN=0 returned=57756 must=57756
+
+ID: select_1 | type: select | query: List all hosts that sent DHCPDISCOVER messages
+  script: human_baselines/dhcp_simple/select_1.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=647 FP=0 FN=0 returned=647 must=647
+
+ID: select_2 | type: select | query: Find the original log timestamps from lines reporting a network is down error, using the timestamp text at the beginning of each matching log line.
+  script: human_baselines/dhcp_simple/select_2.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1212 FP=0 FN=0 returned=1212 must=1212
+
+ID: select_3 | type: select | query: For each DHCP log line where both are available, return the interface and message type
+  script: human_baselines/dhcp_simple/select_3.py
+  precision=0.4868 recall=0.8886 f1=0.6290 TP=351 FP=370 FN=44 returned=721 must=395
+
+# Macro Averages
+# precision=0.7548 recall=0.7776 f1=0.7033

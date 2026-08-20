@@ -1,0 +1,521 @@
+# Evaluation report generated 20260429-123132
+# Source JSON: queries/audit_complex.json
+# Log file input: data/logs/audit
+# Log file resolved: data/logs/audit
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 1
+# Max retries: 4
+# Timeout: 600
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each host, count SELinux AVC denial events and the number of distinct denied permissions.
+  requested output format=host,avc_denial_count,distinct_denied_permission_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    filepath = sys.argv[1]
+    
+    host_stats = {}
+    
+    # Regex for SELinux AVC denials capturing the permissions
+    avc_re = re.compile(r'(?:user_)?avc:\s+denied\s+\{\s*([^}]+?)\s*\}', re.IGNORECASE)
+    
+    # Regexes for various host formats (auditd node, syslog header, msg key-value)
+    node_re = re.compile(r'\bnode=([^\s=]+)')
+    syslog_re = re.compile(r'^(?:[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+([^\s:]+)')
+    host_kv_re = re.compile(r'\b(?:host|hostname)=([^,\s\)]+)')
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                avc_match = avc_re.search(line)
+                if not avc_match:
+                    continue
+                
+                host = None
+                
+                # Determine host
+                node_m = node_re.search(line)
+                if node_m:
+                    host = node_m.group(1)
+                else:
+                    syslog_m = syslog_re.search(line)
+                    if syslog_m:
+                        host = syslog_m.group(1)
+                    else:
+                        host_m = host_kv_re.search(line)
+                        if host_m and host_m.group(1) != '?':
+                            host = host_m.group(1)
+                
+                if not host:
+                    continue
+                    
+                perms = avc_match.group(1).split()
+                
+                if host not in host_stats:
+                    host_stats[host] = {'count': 0, 'perms': set()}
+                    
+                host_stats[host]['count'] += 1
+                for p in perms:
+                    if p:
+                        host_stats[host]['perms'].add(p)
+                        
+        for host, stats in host_stats.items():
+            print(f"{host} {stats['count']} {len(stats['perms'])}")
+            
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9713 recall=0.9769 f1=0.9741 TP=339 FP=10 FN=8 returned=349 must=347
+  may_precision=0.9713 may_recall=0.9769 may_f1=0.9741 may_TP=339 may_FP=10 may_FN=8 may=347
+  retries=0
+  input_tokens=1076 output_tokens=698
+  elapsed_seconds=53.95
+
+ID: multiline_2 | type: select | query: For each host, count SELinux policy load events and enforcing mode changes.
+  requested output format=host,policy_load_count,enforcing_change_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    filename = sys.argv[1]
+    
+    # Dictionary to keep track of counts per host:
+    # host -> [policy_load_count, enforcing_change_count]
+    counts = defaultdict(lambda: [0, 0])
+    
+    # Precompile regexes for performance
+    node_re = re.compile(r'\bnode=(\S+)')
+    type_re = re.compile(r'\btype=(MAC_POLICY_LOAD|MAC_STATUS)\b')
+    
+    try:
+        with open(filename, 'r', errors='ignore') as f:
+            for line in f:
+                node_match = node_re.search(line)
+                host = node_match.group(1) if node_match else 'localhost'
+                
+                # Ensure the host is in the dictionary even if counts are 0
+                if host not in counts:
+                    counts[host] = [0, 0]
+                
+                type_match = type_re.search(line)
+                if type_match:
+                    event_type = type_match.group(1)
+                    if event_type == 'MAC_POLICY_LOAD':
+                        counts[host][0] += 1
+                    elif event_type == 'MAC_STATUS':
+                        counts[host][1] += 1
+                        
+    except FileNotFoundError:
+        pass
+
+    # Output results in requested format
+    for host, (load_count, enforce_count) in counts.items():
+        print(f"{host} {load_count} {enforce_count}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.0588 recall=0.0022 f1=0.0043 TP=2 FP=32 FN=889 returned=34 must=891
+  may_precision=0.0588 may_recall=0.0022 may_f1=0.0043 may_TP=2 may_FP=32 may_FN=889 may=891
+  retries=0
+  input_tokens=1063 output_tokens=446
+  elapsed_seconds=42.21
+
+ID: multiline_3 | type: select | query: Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.
+  requested output format=host,boolean_name,disable_event_timestamp,enable_event_timestamp
+  requested output data type=string,string,float,float
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+
+    filepath = sys.argv[1]
+    
+    ts_re = re.compile(r"msg=audit\((\d+\.\d+):\d+\)")
+    bool_re = re.compile(r"\bbool=([^\s]+)")
+    val_re = re.compile(r"\bval=([01])")
+    old_val_re = re.compile(r"\bold_val=([01])")
+    node_re = re.compile(r"\bnode=([a-zA-Z0-9_\.-]+)")
+    hostname_re = re.compile(r"\bhostname=([a-zA-Z0-9_\.-]+)")
+    
+    states = {}
+    
+    try:
+        opener = gzip.open if filepath.endswith('.gz') else open
+        with opener(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if "bool=" not in line:
+                    continue
+                
+                ts_match = ts_re.search(line)
+                if not ts_match:
+                    continue
+                ts = float(ts_match.group(1))
+                
+                bool_match = bool_re.search(line)
+                if not bool_match:
+                    continue
+                boolean_name = bool_match.group(1)
+                
+                val_match = val_re.search(line)
+                old_val_match = old_val_re.search(line)
+                if not (val_match and old_val_match):
+                    continue
+                    
+                val = val_match.group(1)
+                old_val = old_val_match.group(1)
+                
+                host = None
+                node_match = node_re.search(line)
+                if node_match:
+                    host = node_match.group(1)
+                else:
+                    hostname_match = hostname_re.search(line)
+                    if hostname_match:
+                        host = hostname_match.group(1)
+                
+                if not host:
+                    continue
+                    
+                key = (host, boolean_name)
+                
+                if old_val == "1" and val == "0":
+                    states[key] = ts
+                elif old_val == "0" and val == "1":
+                    if key in states:
+                        disable_ts = states[key]
+                        print(f"{host} {boolean_name} {disable_ts} {ts}")
+                        del states[key]
+                        
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    main()
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=14 returned=0 must=14
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=0 may_FN=14 may=14
+  retries=3
+  input_tokens=4763 output_tokens=3032
+  elapsed_seconds=266.18
+
+ID: multiline_4 | type: select | query: For each host and PAM action, count total PAM events and how many of those events ended in failure.
+  requested output format=host,pam_action,pam_event_count,failed_pam_event_count
+  requested output data type=string,string,integer,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def process_file(filepath):
+    # stats mapping (host, action) -> [total_events, failed_events]
+    stats = defaultdict(lambda: [0, 0])
+    
+    # Precompile regexes for efficiency
+    pam_re = re.compile(r"PAM:\s+([^\s]+)")
+    node_re = re.compile(r"\bnode=([^\s,)'\"]+)")
+    hostname_re = re.compile(r"\bhostname=([^\s,)'\"]+)")
+    rhost_re = re.compile(r"\brhost=([^\s,)'\"]+)")
+    res_re = re.compile(r"\bres=([^\s,)'\"]+)")
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'PAM:' not in line:
+                    continue
+                    
+                pam_match = pam_re.search(line)
+                if not pam_match:
+                    continue
+                action = pam_match.group(1)
+                
+                host = None
+                node_match = node_re.search(line)
+                if node_match:
+                    host = node_match.group(1)
+                else:
+                    hostname_match = hostname_re.search(line)
+                    if hostname_match:
+                        host = hostname_match.group(1)
+                    else:
+                        rhost_match = rhost_re.search(line)
+                        if rhost_match:
+                            host = rhost_match.group(1)
+                
+                if not host:
+                    continue
+                    
+                res_match = res_re.search(line)
+                if not res_match:
+                    continue
+                res = res_match.group(1)
+                
+                stats[(host, action)][0] += 1
+                if res.lower() != 'success':
+                    stats[(host, action)][1] += 1
+                    
+    except Exception as e:
+        pass
+        
+    for (host, action), (total, failed) in stats.items():
+        print(f"{host} {action} {total} {failed}")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=11 FN=93 returned=11 must=93
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=11 may_FN=93 may=93
+  retries=0
+  input_tokens=1084 output_tokens=619
+  elapsed_seconds=39.0
+
+ID: multiline_5 | type: select | query: For each source address, count failed SSH authentication attempts recorded by sshd.
+  requested output format=source_address,failed_ssh_attempt_count
+  requested output data type=string,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    counts = defaultdict(int)
+    seen = set()
+    
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'res=failed' not in line:
+                    continue
+                if 'sshd' not in line and 'terminal=ssh' not in line:
+                    continue
+                
+                m_type = re.search(r'type=(USER_LOGIN|USER_AUTH|USER_ERR)', line)
+                if not m_type:
+                    continue
+                    
+                m_addr = re.search(r'addr="?([^",\s]+)"?', line)
+                if not m_addr:
+                    continue
+                    
+                addr = m_addr.group(1)
+                if addr == '?' or addr == '':
+                    continue
+                    
+                m_tx = re.search(r'msg=audit\(([^)]+)\)', line)
+                tx = m_tx.group(1) if m_tx else line.strip()
+                
+                key = (addr, tx)
+                if key not in seen:
+                    seen.add(key)
+                    counts[addr] += 1
+                    
+        for addr, count in counts.items():
+            print(f"{addr} {count}")
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.5217 f1=0.6857 TP=12 FP=0 FN=11 returned=12 must=23
+  may_precision=1.0000 may_recall=0.5217 may_f1=0.6857 may_TP=12 may_FP=0 may_FN=11 may=23
+  retries=0
+  input_tokens=1054 output_tokens=400
+  elapsed_seconds=62.42
+
+ID: multiline_6 | type: select | query: For each systemd service unit, count unit start events and unit stop events.
+  requested output format=service_unit,unit_start_count,unit_stop_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    counts = {}
+    type_re = re.compile(r'\btype=(SERVICE_START|SERVICE_STOP|1130|1131)\b', re.IGNORECASE)
+    unit_re = re.compile(r'\bunit=(?:"([^"]+)"|\'([^\']+)\'|([^ \t\n\'"<>,]+))')
+    
+    try:
+        with open(sys.argv[1], 'r', errors='ignore') as f:
+            for line in f:
+                type_match = type_re.search(line)
+                if not type_match:
+                    continue
+                    
+                t = type_match.group(1).upper()
+                if t in ('SERVICE_START', '1130'):
+                    event = 'start'
+                else:
+                    event = 'stop'
+                    
+                unit_match = unit_re.search(line)
+                if unit_match:
+                    unit = unit_match.group(1) or unit_match.group(2) or unit_match.group(3)
+                    if unit not in counts:
+                        counts[unit] = {'start': 0, 'stop': 0}
+                    counts[unit][event] += 1
+                    
+        for unit, c in counts.items():
+            print(f"{unit} {c['start']} {c['stop']}")
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.8166 recall=0.8539 f1=0.8348 TP=187 FP=42 FN=32 returned=229 must=219
+  may_precision=0.8166 may_recall=0.8539 may_f1=0.8348 may_TP=187 may_FP=42 may_FN=32 may=219
+  retries=0
+  input_tokens=1067 output_tokens=402
+  elapsed_seconds=33.37
+
+ID: multiline_7 | type: select | query: For each host, count audit subsystem initialization events and audit daemon process ID set events.
+  requested output format=host,audit_initialized_count,audit_pid_set_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_file = sys.argv[1]
+    
+    counts = {}
+    
+    # Regex for standard BSD syslog or ISO8601 syslog to extract host
+    syslog_re = re.compile(r'^(?:[A-Z][a-z]{2}\s+\d+\s+\d\d:\d\d:\d\d|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+(\S+)\s+')
+    
+    # Regex for auditd node= attribute
+    node_re = re.compile(r'\bnode="?([^",\s]+)"?')
+    
+    # Regex for hostname= in PAM or other messages
+    hostname_re = re.compile(r'\bhostname="?([^",\s\)]+)"?')
+    
+    # Regex for Event 1: audit subsystem initialization
+    init_re = re.compile(r'(?:state=initialized|initializing netlink subsys|\btype=(?:2000|KERNEL)\b.*?\binitialized\b|audit subsystem initialization)', re.IGNORECASE)
+    
+    # Regex for Event 2: audit daemon process ID set
+    pid_re = re.compile(r'(?:\baudit_pid=\d+|op="?(?:set )?audit_pid"?|audit daemon process ID set)', re.IGNORECASE)
+    
+    try:
+        if log_file.endswith('.gz'):
+            import gzip
+            f = gzip.open(log_file, 'rt', encoding='utf-8', errors='ignore')
+        else:
+            f = open(log_file, 'r', encoding='utf-8', errors='ignore')
+            
+        for line in f:
+            host = None
+            
+            # Attempt to extract host from audit node=
+            m_node = node_re.search(line)
+            if m_node:
+                host = m_node.group(1)
+            else:
+                # Fallback to syslog header
+                m_syslog = syslog_re.match(line)
+                if m_syslog:
+                    host = m_syslog.group(1)
+                else:
+                    # Fallback to embedded hostname= field
+                    m_hostname = hostname_re.search(line)
+                    if m_hostname and m_hostname.group(1) != '?':
+                        host = m_hostname.group(1)
+                        
+            if not host:
+                continue
+                
+            is_init = bool(init_re.search(line))
+            is_pid = bool(pid_re.search(line))
+            
+            if is_init or is_pid:
+                if host not in counts:
+                    counts[host] = {'init': 0, 'pid': 0}
+                if is_init:
+                    counts[host]['init'] += 1
+                if is_pid:
+                    counts[host]['pid'] += 1
+                    
+        f.close()
+        
+    except Exception:
+        pass
+        
+    for host, c in counts.items():
+        print(f"{host} {c['init']} {c['pid']}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.9957 recall=0.9983 f1=0.9970 TP=1157 FP=5 FN=2 returned=1162 must=1159
+  may_precision=0.9957 may_recall=0.9983 may_f1=0.9970 may_TP=1157 may_FP=5 may_FN=2 may=1159
+  retries=0
+  input_tokens=1068 output_tokens=866
+  elapsed_seconds=122.41
+
+ID: multiline_8 | type: select | query: For each executable path and signal number, count crash signal events.
+  requested output format=executable_path,signal_number,crash_event_count
+  requested output data type=string,string,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    counts = defaultdict(int)
+    exe_re = re.compile(r'\bexe=(?:"([^"]+)"|([^\s]+))')
+    sig_re = re.compile(r'\bsig=([0-9]+)\b')
+
+    try:
+        with open(sys.argv[1], 'r') as f:
+            for line in f:
+                if 'ANOM_ABEND' in line or 'CORE_DUMP' in line or 'CRASH' in line:
+                    exe_m = exe_re.search(line)
+                    sig_m = sig_re.search(line)
+                    if exe_m and sig_m:
+                        exe = exe_m.group(1) or exe_m.group(2)
+                        sig = sig_m.group(1)
+                        counts[(exe, sig)] += 1
+
+        for (exe, sig), count in counts.items():
+            print(f"{exe} {sig} {count}")
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.2500 f1=0.4000 TP=2 FP=0 FN=6 returned=2 must=8
+  may_precision=1.0000 may_recall=0.2500 may_f1=0.4000 may_TP=2 may_FP=0 may_FN=6 may=8
+  retries=0
+  input_tokens=1060 output_tokens=322
+  elapsed_seconds=29.63
+
+# Macro Averages (where/select queries)
+# precision=0.6053 recall=0.4504 f1=0.4870
+# may_precision=0.6053 may_recall=0.4504 may_f1=0.4870
+# retries_total=3 retries_avg=0.38
+# total_input_tokens=12235 total_output_tokens=6785
+# total_elapsed=649.17s avg_elapsed=81.15s
+# Worst 5 queries by f1
+# 1. multiline_3 | type: select | f1=0.0000 | query: Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.
+# 2. multiline_4 | type: select | f1=0.0000 | query: For each host and PAM action, count total PAM events and how many of those events ended in failure.
+# 3. multiline_2 | type: select | f1=0.0043 | query: For each host, count SELinux policy load events and enforcing mode changes.
+# 4. multiline_8 | type: select | f1=0.4000 | query: For each executable path and signal number, count crash signal events.
+# 5. multiline_5 | type: select | f1=0.6857 | query: For each source address, count failed SSH authentication attempts recorded by sshd.

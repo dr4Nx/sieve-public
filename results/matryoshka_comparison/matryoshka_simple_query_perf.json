@@ -1,0 +1,2580 @@
+{
+  "summary": {
+    "cron": {
+      "n_queries": 12,
+      "mean_f1": 1.0
+    },
+    "sshd": {
+      "n_queries": 12,
+      "mean_f1": 0.9813
+    },
+    "audit": {
+      "n_queries": 12,
+      "mean_f1": 0.9953
+    },
+    "puppet": {
+      "n_queries": 12,
+      "mean_f1": 0.9992
+    },
+    "dhcp": {
+      "n_queries": 32,
+      "mean_f1": 0.9757,
+      "where": {
+        "n": 22,
+        "mean_f1": 0.9888
+      },
+      "select": {
+        "n": 10,
+        "mean_f1": 0.9469
+      }
+    },
+    "overall": {
+      "n_queries": 80,
+      "mean_f1": 0.9867
+    }
+  },
+  "logs": {
+    "cron": {
+      "cron_query_1": {
+        "natural_language": "Find log lines showing cron job command executions.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2530,
+        "n_gt": 2530,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "command",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_2": {
+        "natural_language": "Find log lines showing cron session openings.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 5007,
+        "n_gt": 5007,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "opened",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_3": {
+        "natural_language": "Find log lines showing cron session closings.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 5008,
+        "n_gt": 5008,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "closed",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_4": {
+        "natural_language": "Find log lines showing cron sessions opened for the root user.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9998,
+        "recall": 1.0,
+        "f1": 0.9999,
+        "n_result": 5007,
+        "n_gt": 5006,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "opened",
+                "exact": true
+              },
+              {
+                "attribute_name": "system_user",
+                "attribute_value": "root",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_5": {
+        "natural_language": "Find cron command-execution log lines on July 14, 2017.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 83,
+        "n_gt": 83,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "command",
+                "existence": true
+              },
+              {
+                "attribute_name": "timestamp",
+                "attribute_value": "2017-07-14",
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_6": {
+        "natural_language": "Find log lines mentioning the RANDOM_DELAY scaling factor.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1,
+        "n_gt": 1,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "setting_name",
+                "attribute_value": "RANDOM_DELAY",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_7": {
+        "natural_language": "Find log lines showing that the cron daemon started with inotify support.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1,
+        "n_gt": 1,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "feature_name",
+                "attribute_value": "inotify",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_8": {
+        "natural_language": "Find all cron log lines from July 14, 2017 between 03:00 and 04:00.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 16,
+        "n_gt": 16,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "timestamp",
+                "attribute_value": "2017-07-14T03:00:00-04:00",
+                "comparison": ">=",
+                "value_type": "datetime"
+              },
+              {
+                "attribute_name": "timestamp",
+                "attribute_value": "2017-07-14T04:00:00-04:00",
+                "comparison": "<=",
+                "value_type": "datetime"
+              }
+            ]
+          }
+        }
+      },
+      "cron_query_9": {
+        "natural_language": "Find all cron log lines with process ID 21832.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2,
+        "n_gt": 2,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "process_id",
+                "attribute_value": "21832",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "cron_select_1": {
+        "natural_language": "Find the distinct commands that were executed by cron jobs.",
+        "query_type": "select",
+        "output_format": [
+          "command"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 4,
+        "n_gt": 4,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "command",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "command"
+            }
+          ]
+        }
+      },
+      "cron_select_2": {
+        "natural_language": "Find the usernames under which cron jobs were executed.",
+        "query_type": "select",
+        "output_format": [
+          "username"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1,
+        "n_gt": 1,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "command",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "system_user"
+            }
+          ]
+        }
+      },
+      "cron_select_3": {
+        "natural_language": "Find the distinct dates on which cron activity was logged.",
+        "query_type": "select",
+        "output_format": [
+          "date"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 26,
+        "n_gt": 26,
+        "translation": {
+          "query_type": "select",
+          "filter": null,
+          "select": [
+            {
+              "attr": "timestamp",
+              "regex": "(\\d{4}-\\d{2}-\\d{2})"
+            }
+          ]
+        }
+      }
+    },
+    "sshd": {
+      "sshd_query_1": {
+        "natural_language": "Find log lines recording SSH authentication failures, including Failed password, Invalid user, and PAM authentication failure events.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9832,
+        "recall": 0.9908,
+        "f1": 0.987,
+        "n_result": 2854,
+        "n_gt": 2832,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "operator": "AND",
+                "conditions": [
+                  {
+                    "attribute_name": "pam_module",
+                    "attribute_value": "pam_unix",
+                    "exact": true
+                  },
+                  {
+                    "operator": "OR",
+                    "conditions": [
+                      {
+                        "attribute_name": "outcome",
+                        "attribute_value": "failure;",
+                        "exact": true
+                      },
+                      {
+                        "attribute_name": "outcome",
+                        "attribute_value": "failures;",
+                        "exact": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "attribute_name": "action",
+                "attribute_value": "Failed",
+                "exact": true
+              },
+              {
+                "attribute_name": "invalid_user_name",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_2": {
+        "natural_language": "Find log lines showing successful SSH logins using password authentication.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 636,
+        "n_gt": 636,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "Accepted",
+                "exact": true
+              },
+              {
+                "attribute_name": "auth_method",
+                "attribute_value": "password",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_3": {
+        "natural_language": "Find log lines showing successful SSH logins using public key authentication.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 207,
+        "n_gt": 207,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "Accepted",
+                "exact": true
+              },
+              {
+                "attribute_name": "auth_method",
+                "attribute_value": "publickey",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_4": {
+        "natural_language": "Find log lines where an SSH login was attempted with an invalid or unknown username.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9742,
+        "recall": 0.9947,
+        "f1": 0.9843,
+        "n_result": 1355,
+        "n_gt": 1327,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_name": "user_status",
+                "attribute_value": "unknown",
+                "exact": true
+              },
+              {
+                "attribute_name": "user_status",
+                "attribute_value": "invalid user",
+                "exact": true
+              },
+              {
+                "attribute_name": "user_status",
+                "attribute_value": "invalid",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_5": {
+        "natural_language": "Find log lines showing SSH session openings.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 13244,
+        "n_gt": 13244,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "opened",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_6": {
+        "natural_language": "Find log lines showing SSH session closings.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 12797,
+        "n_gt": 12797,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "action",
+                "attribute_value": "closed",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_7": {
+        "natural_language": "Find log lines showing SSH network-level disconnection events.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 164,
+        "n_gt": 164,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Received disconnect",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Disconnected from",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Connection closed by",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Connection reset by",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_8": {
+        "natural_language": "Find log lines showing the SSH server starting and listening on a port.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.95,
+        "recall": 1.0,
+        "f1": 0.9744,
+        "n_result": 420,
+        "n_gt": 399,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "listen_port",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_query_9": {
+        "natural_language": "Find log lines reporting deprecated SSH configuration options.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2023,
+        "n_gt": 2023,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "option_name",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "sshd_select_1": {
+        "natural_language": "Find the source IP addresses or hostnames that caused SSH authentication failures (including Failed password, Invalid user, and unknown user attempts).",
+        "query_type": "select",
+        "output_format": [
+          "source"
+        ],
+        "precision": 0.8901,
+        "recall": 1.0,
+        "f1": 0.9419,
+        "n_result": 91,
+        "n_gt": 81,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "operator": "AND",
+                "conditions": [
+                  {
+                    "attribute_name": "pam_module",
+                    "attribute_value": "pam_unix",
+                    "exact": true
+                  },
+                  {
+                    "operator": "OR",
+                    "conditions": [
+                      {
+                        "attribute_name": "outcome",
+                        "attribute_value": "failure;",
+                        "exact": true
+                      },
+                      {
+                        "attribute_name": "outcome",
+                        "attribute_value": "failures;",
+                        "exact": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "attribute_name": "action",
+                "attribute_value": "Failed",
+                "exact": true
+              },
+              {
+                "attribute_name": "invalid_user_name",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": [
+                "source_address",
+                "source_hostname"
+              ]
+            }
+          ]
+        }
+      },
+      "sshd_select_2": {
+        "natural_language": "Find the usernames that were targeted in SSH authentication failure attempts (including Failed password, Invalid user, and unknown user attempts).",
+        "query_type": "select",
+        "output_format": [
+          "username"
+        ],
+        "precision": 0.9333,
+        "recall": 1.0,
+        "f1": 0.9655,
+        "n_result": 60,
+        "n_gt": 56,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "operator": "AND",
+                "conditions": [
+                  {
+                    "attribute_name": "pam_module",
+                    "attribute_value": "pam_unix",
+                    "exact": true
+                  },
+                  {
+                    "operator": "OR",
+                    "conditions": [
+                      {
+                        "attribute_name": "outcome",
+                        "attribute_value": "failure;",
+                        "exact": true
+                      },
+                      {
+                        "attribute_name": "outcome",
+                        "attribute_value": "failures;",
+                        "exact": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "attribute_name": "action",
+                "attribute_value": "Failed",
+                "exact": true
+              },
+              {
+                "attribute_name": "invalid_user_name",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": [
+                "user_name",
+                "invalid_user_name"
+              ]
+            }
+          ]
+        }
+      },
+      "sshd_select_3": {
+        "natural_language": "Find the ports on which the SSH server was configured to listen.",
+        "query_type": "select",
+        "output_format": [
+          "port"
+        ],
+        "precision": 0.8571,
+        "recall": 1.0,
+        "f1": 0.9231,
+        "n_result": 7,
+        "n_gt": 6,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "listen_port",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "listen_port"
+            }
+          ]
+        }
+      }
+    },
+    "audit": {
+      "audit_query_1": {
+        "natural_language": "Find audit log lines that report SELinux AVC denials.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 0.9999,
+        "f1": 0.9999,
+        "n_result": 16915,
+        "n_gt": 16917,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1400",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "AVC",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1107",
+                    "exact": true
+                  }
+                ]
+              },
+              {
+                "attribute_name": "outcome",
+                "attribute_value": "denied",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_2": {
+        "natural_language": "Find audit log lines that show SELinux policy loads.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9999,
+        "recall": 0.9999,
+        "f1": 0.9999,
+        "n_result": 7439,
+        "n_gt": 7439,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "event_action",
+                "attribute_value": "loaded",
+                "exact": true
+              },
+              {
+                "attribute_name": "object",
+                "attribute_value": "policy",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_3": {
+        "natural_language": "Find audit log lines that show SELinux boolean changes.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 70,
+        "n_gt": 70,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_name": "boolean_name",
+                "existence": true
+              },
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1405",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "MAC_CONFIG_CHANGE",
+                    "exact": true
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_4": {
+        "natural_language": "Find audit log lines that show SELinux enforcing mode changes.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9994,
+        "recall": 1.0,
+        "f1": 0.9997,
+        "n_result": 7033,
+        "n_gt": 7029,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "enforcing_status",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_5": {
+        "natural_language": "Find audit log lines showing kernel audit initialization events.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9998,
+        "recall": 0.9998,
+        "f1": 0.9998,
+        "n_result": 9535,
+        "n_gt": 9535,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_name": "event_type",
+                "attribute_value": "2000",
+                "exact": true
+              },
+              {
+                "attribute_name": "event_type",
+                "attribute_value": "KERNEL",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_6": {
+        "natural_language": "Find audit log lines that record the audit daemon process ID being set or changed.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 0.9997,
+        "f1": 0.9999,
+        "n_result": 3553,
+        "n_gt": 3554,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "audit_process_id",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_7": {
+        "natural_language": "Find audit log lines for failed SSH authentication attempts handled by sshd.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1189,
+        "n_gt": 1189,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "executable_path",
+                "attribute_value": "/usr/sbin/sshd",
+                "exact": true
+              },
+              {
+                "attribute_name": "outcome",
+                "attribute_value": "failed",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_8": {
+        "natural_language": "Find audit log lines for PAM session open events.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9923,
+        "recall": 1.0,
+        "f1": 0.9961,
+        "n_result": 2599,
+        "n_gt": 2579,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_name": "pam_action",
+                "attribute_value": "session open",
+                "exact": true
+              },
+              {
+                "attribute_name": "pam_action",
+                "attribute_value": "PAM:session_open",
+                "exact": true
+              },
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1105",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "USER_START",
+                    "exact": true
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "audit_query_9": {
+        "natural_language": "Find audit log lines for systemd unit start events that name a service unit.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9834,
+        "recall": 0.9834,
+        "f1": 0.9834,
+        "n_result": 2717,
+        "n_gt": 2717,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1130",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "SERVICE_START",
+                    "exact": true
+                  }
+                ]
+              },
+              {
+                "attribute_name": "service_unit",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "audit_select_1": {
+        "natural_language": "Find the hosts that logged SELinux AVC denials.",
+        "query_type": "select",
+        "output_format": [
+          "host"
+        ],
+        "precision": 0.9943,
+        "recall": 0.9971,
+        "f1": 0.9957,
+        "n_result": 348,
+        "n_gt": 347,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1400",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "AVC",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1107",
+                    "exact": true
+                  }
+                ]
+              },
+              {
+                "attribute_name": "outcome",
+                "attribute_value": "denied",
+                "exact": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_host"
+            }
+          ]
+        }
+      },
+      "audit_select_2": {
+        "natural_language": "Find the SELinux boolean names that were changed.",
+        "query_type": "select",
+        "output_format": [
+          "boolean_name"
+        ],
+        "precision": 1.0,
+        "recall": 0.9412,
+        "f1": 0.9697,
+        "n_result": 16,
+        "n_gt": 17,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "boolean_name",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "boolean_name"
+            }
+          ]
+        }
+      },
+      "audit_select_3": {
+        "natural_language": "Find the service unit names reported in systemd unit start events.",
+        "query_type": "select",
+        "output_format": [
+          "service_unit"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 216,
+        "n_gt": 216,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "1130",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "event_type",
+                    "attribute_value": "SERVICE_START",
+                    "exact": true
+                  }
+                ]
+              },
+              {
+                "attribute_name": "service_unit",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "service_unit"
+            }
+          ]
+        }
+      }
+    },
+    "puppet": {
+      "puppet_query_1": {
+        "natural_language": "Find log lines indicating Puppet runs were disabled by an administrative action.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.9802,
+        "recall": 1.0,
+        "f1": 0.99,
+        "n_result": 202,
+        "n_gt": 198,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Disabling Puppet",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Skipping run of Puppet configuration client",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "disabling puppet",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_2": {
+        "natural_language": "Find log lines indicating Puppet execution was re-enabled after being disabled.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 66,
+        "n_gt": 66,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Enabling Puppet",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_3": {
+        "natural_language": "Find log lines where Puppet says it could not fetch the node definition it needed.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 59,
+        "n_gt": 59,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Unable to fetch my node definition",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_4": {
+        "natural_language": "Find log lines showing the agent could not retrieve its catalog from a remote source.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 101,
+        "n_gt": 101,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Could not retrieve catalog from remote server",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_5": {
+        "natural_language": "Find log lines showing the agent fell back to a cached catalog after a remote problem.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 66,
+        "n_gt": 66,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Using cached catalog",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_6": {
+        "natural_language": "Find log lines showing Puppet could not deliver its report back to a remote service.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 33,
+        "n_gt": 33,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Could not send report",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_7": {
+        "natural_language": "Find log lines showing resources were skipped because a dependency chain had already failed.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 38356,
+        "n_gt": 38356,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Skipping because of failed dependencies",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_8": {
+        "natural_language": "Find log lines where Puppet reports that a needed command could not be found.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 118,
+        "n_gt": 118,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "command not found",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_query_9": {
+        "natural_language": "Find log lines showing certificate validation or trust failures during remote Puppet communication.",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 128,
+        "n_gt": 128,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "certificate verify failed",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "puppet_select_1": {
+        "natural_language": "Find the hosts that experienced remote catalog retrieval failures.",
+        "query_type": "select",
+        "output_format": [
+          "host"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 18,
+        "n_gt": 18,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Could not retrieve catalog from remote server",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_host"
+            }
+          ]
+        }
+      },
+      "puppet_select_2": {
+        "natural_language": "Find the configuration versions that were applied during Puppet runs.",
+        "query_type": "select",
+        "output_format": [
+          "configuration_version"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 93,
+        "n_gt": 93,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "configuration_version",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "configuration_version",
+              "regex": "(\\d+)"
+            }
+          ]
+        }
+      },
+      "puppet_select_3": {
+        "natural_language": "Find the resource identifiers that were skipped because of failed dependencies.",
+        "query_type": "select",
+        "output_format": [
+          "resource_identifier"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1691,
+        "n_gt": 1691,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Skipping because of failed dependencies",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "resource_identifier"
+            }
+          ]
+        }
+      }
+    },
+    "dhcp": {
+      "dhcp_query_1": {
+        "natural_language": "Return lines assigning an IP to host laphroaig",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 23,
+        "n_gt": 23,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "log_host",
+                "attribute_value": "laphroaig",
+                "exact": true
+              },
+              {
+                "attribute_name": "action",
+                "attribute_value": "bound",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_3": {
+        "natural_language": "Return all log lines for transaction ID 0x6520bf0e",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 4100,
+        "n_gt": 4100,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_transaction_id",
+                "attribute_value": "0x6520bf0e",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_10": {
+        "natural_language": "Return logs reporting bad IP checksums",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 8,
+        "n_gt": 8,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "bad IP checksums",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "simple_1": {
+        "natural_language": "Show all DHCPACK messages",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 35522,
+        "n_gt": 35522,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_message",
+                "attribute_value": "DHCPACK",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "simple_2": {
+        "natural_language": "Find logs from interface eth0",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 69489,
+        "n_gt": 69491,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "interface_name",
+                "attribute_value": "eth0",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "simple_3": {
+        "natural_language": "Show messages from host localhost",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 96724,
+        "n_gt": 96724,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "log_host",
+                "attribute_value": "localhost",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "complex_1": {
+        "natural_language": "Find DHCPREQUEST messages on interface eth0 from host localhost with port 67",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 11698,
+        "n_gt": 11698,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_message",
+                "attribute_value": "DHCPREQUEST",
+                "exact": true
+              },
+              {
+                "attribute_name": "interface_name",
+                "attribute_value": "eth0",
+                "exact": true
+              },
+              {
+                "attribute_name": "log_host",
+                "attribute_value": "localhost",
+                "exact": true
+              },
+              {
+                "attribute_name": "dhcp_destination_port",
+                "attribute_value": "67",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "complex_2": {
+        "natural_language": "Show DHCPOFFER or DHCPACK messages from server 192.168.1.1",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 5490,
+        "n_gt": 5490,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "attribute_name": "dhcp_message",
+                    "attribute_value": "DHCPOFFER",
+                    "exact": true
+                  },
+                  {
+                    "attribute_name": "dhcp_message",
+                    "attribute_value": "DHCPACK",
+                    "exact": true
+                  }
+                ]
+              },
+              {
+                "attribute_name": "source_ip",
+                "attribute_value": "192.168.1.1",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "complex_3": {
+        "natural_language": "Find all DHCP messages with transaction ID starting with 0x7",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 6883,
+        "n_gt": 6883,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "xid=0x7",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "vague_1": {
+        "natural_language": "Show me DHCP errors",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 0.9756,
+        "f1": 0.9877,
+        "n_result": 26714,
+        "n_gt": 22394,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "send_packet: No such device",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Network is unreachable",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Network is down",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "No buffer space available",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "receive_packet failed",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Failed to send",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "No DHCPOFFERS received",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "No working leases",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "unknown hardware address type",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "bad IP checksums",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "suspect value",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "already running - exiting",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "please consult README",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "vague_2": {
+        "natural_language": "Find network problems",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 0.8689,
+        "recall": 0.9972,
+        "f1": 0.9286,
+        "n_result": 26714,
+        "n_gt": 20049,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "send_packet: No such device",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Network is unreachable",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Network is down",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "No buffer space available",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "receive_packet failed",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "Failed to send",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "No DHCPOFFERS received",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "No working leases",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "unknown hardware address type",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "bad IP checksums",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "suspect value",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "already running - exiting",
+                "static_match": true,
+                "exact": false
+              },
+              {
+                "attribute_value": "please consult README",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "numerical_1": {
+        "natural_language": "Find entries with process ID greater than 5000",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 104648,
+        "n_gt": 104648,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "process_id",
+                "attribute_value": "5000",
+                "comparison": ">",
+                "value_type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "numerical_2": {
+        "natural_language": "Show logs with retry interval less than 5",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 5431,
+        "n_gt": 5431,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "interval",
+                "attribute_value": "5",
+                "comparison": "<",
+                "value_type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "time_1": {
+        "natural_language": "Show logs from June 18",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1495,
+        "n_gt": 1495,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "log_timestamp",
+                "attribute_value": "Jun 18",
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "time_2": {
+        "natural_language": "Find messages from September",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 57756,
+        "n_gt": 57756,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "log_timestamp",
+                "attribute_value": "Sep",
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "select_1": {
+        "natural_language": "List all hosts that sent DHCPDISCOVER messages",
+        "query_type": "select",
+        "output_format": null,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 647,
+        "n_gt": 647,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_message",
+                "attribute_value": "DHCPDISCOVER",
+                "exact": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_host"
+            }
+          ]
+        }
+      },
+      "select_2": {
+        "natural_language": "Find the original log timestamps from lines reporting a network is down error, using the timestamp text at the beginning of each matching log line.",
+        "query_type": "select",
+        "output_format": [
+          "log_timestamp"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 1212,
+        "n_gt": 1212,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "Network is down",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_timestamp"
+            }
+          ]
+        }
+      },
+      "select_3": {
+        "natural_language": "For each DHCP log line where both are available, return the interface and message type",
+        "query_type": "select",
+        "output_format": [
+          "interface_name",
+          "message_type"
+        ],
+        "precision": 0.9899,
+        "recall": 0.9899,
+        "f1": 0.9899,
+        "n_result": 395,
+        "n_gt": 395,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "interface_name",
+                "existence": true
+              },
+              {
+                "attribute_name": "dhcp_message",
+                "existence": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "interface_name"
+            },
+            {
+              "attr": "dhcp_message"
+            }
+          ]
+        }
+      },
+      "dhcp_select_1": {
+        "natural_language": "Return DHCP server IP addresses that are not broadcast addresses",
+        "query_type": "select",
+        "output_format": [
+          "server_ip"
+        ],
+        "precision": 1.0,
+        "recall": 0.3167,
+        "f1": 0.4811,
+        "n_result": 267,
+        "n_gt": 843,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_destination_ip",
+                "attribute_value": "255.255.255.255",
+                "exact": true,
+                "negation": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "dhcp_destination_ip"
+            }
+          ]
+        }
+      },
+      "dhcp_select_2": {
+        "natural_language": "Find the MAC addresses reported for host laphroaig",
+        "query_type": "select",
+        "output_format": [
+          "mac_address"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2,
+        "n_gt": 2,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "log_host",
+                "attribute_value": "laphroaig",
+                "exact": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "interface_mac"
+            }
+          ]
+        }
+      },
+      "dhcp_select_3": {
+        "natural_language": "Return all IPs that were assigned with lease durations over a day",
+        "query_type": "select",
+        "output_format": null,
+        "precision": 1.0,
+        "recall": 0.997,
+        "f1": 0.9985,
+        "n_result": 337,
+        "n_gt": 338,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "lease_renewal_duration",
+                "attribute_value": "86400",
+                "comparison": ">",
+                "value_type": "number"
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "assigned_ip"
+            }
+          ]
+        }
+      },
+      "dhcp_select_4": {
+        "natural_language": "Find the unique DHCP destination IPs used with non-standard ports",
+        "query_type": "select",
+        "output_format": [
+          "destination_ip"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 3,
+        "n_gt": 3,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_destination_port",
+                "attribute_value": "67",
+                "exact": true,
+                "negation": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "dhcp_destination_ip"
+            }
+          ]
+        }
+      },
+      "dhcp_select_5": {
+        "natural_language": "Find the hosts using DHCP client version 3.0.1",
+        "query_type": "select",
+        "output_format": [
+          "hostname"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2,
+        "n_gt": 2,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "client_version",
+                "attribute_value": "3.0.1",
+                "exact": false
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_host"
+            }
+          ]
+        }
+      },
+      "dhcp_select_6": {
+        "natural_language": "List all hosts which sent a DHCPDISCOVER messages",
+        "query_type": "select",
+        "output_format": null,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 647,
+        "n_gt": 647,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_message",
+                "attribute_value": "DHCPDISCOVER",
+                "exact": true
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_host"
+            }
+          ]
+        }
+      },
+      "dhcp_select_7": {
+        "natural_language": "Find the unique hosts reporting an XMT Renew message",
+        "query_type": "select",
+        "output_format": [
+          "hostname"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2,
+        "n_gt": 2,
+        "translation": {
+          "query_type": "select",
+          "filter": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "attribute_value": "XMT: Renew",
+                "static_match": true,
+                "exact": false
+              }
+            ]
+          },
+          "select": [
+            {
+              "attr": "log_host"
+            }
+          ]
+        }
+      },
+      "dhcp_query_2": {
+        "natural_language": "Return log lines reporting DHCP server IP addresses that are not broadcast addresses",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 0.7209,
+        "f1": 0.8378,
+        "n_result": 110075,
+        "n_gt": 152690,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_destination_ip",
+                "attribute_value": "255.255.255.255",
+                "exact": true,
+                "negation": true
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_4": {
+        "natural_language": "Get all lines reporting MAC addresses for host laphroaig",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 46,
+        "n_gt": 46,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "log_host",
+                "attribute_value": "laphroaig",
+                "exact": true
+              },
+              {
+                "attribute_name": "interface_mac",
+                "existence": true
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_5": {
+        "natural_language": "List all log lines reporting IP assignments with lease durations over a day",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 2998,
+        "n_gt": 2998,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "lease_renewal_duration",
+                "attribute_value": "86400",
+                "comparison": ">",
+                "value_type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_6": {
+        "natural_language": "List all log lines reporting DHCP destination IPs running on non standard ports",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 9,
+        "n_gt": 9,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_destination_port",
+                "attribute_value": "67",
+                "exact": true,
+                "negation": true
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_7": {
+        "natural_language": "List all log lines reporting hosts using client version 3.0.1",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 5,
+        "n_gt": 5,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "client_version",
+                "attribute_value": "3.0.1",
+                "exact": false
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_8": {
+        "natural_language": "List all log lines reporting DHCPDISCOVER messages",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 37738,
+        "n_gt": 37738,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_message",
+                "attribute_value": "DHCPDISCOVER",
+                "exact": true
+              }
+            ]
+          }
+        }
+      },
+      "dhcp_query_9": {
+        "natural_language": "List all log lines reporting XMT Renew messages",
+        "query_type": "where",
+        "output_format": [
+          "raw_line"
+        ],
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n_result": 4,
+        "n_gt": 4,
+        "translation": {
+          "query_type": "where",
+          "filter": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "attribute_name": "dhcp_message",
+                "attribute_value": "Renew",
+                "exact": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

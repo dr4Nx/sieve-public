@@ -1,0 +1,14 @@
+# Human baseline macro F1 — matches Table 'Human vs Sieve' Human column.
+
+Dataset       Human  
+------------------------
+Cron (S)      1.000  
+Cron (C)      0.906  
+SSH (S)       0.994  
+SSH (C)       0.742  
+Audit (S)     0.982  
+Audit (C)     0.659  
+DHCP (S)      0.703  
+DHCP (C)      0.469  
+Puppet (S)    0.999  
+Puppet (C)    0.534  

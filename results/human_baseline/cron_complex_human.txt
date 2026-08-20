@@ -1,0 +1,39 @@
+# Human baseline report for cron_complex
+# Baseline scripts: human_baselines/cron_complex
+# Log file: data/logs/cron
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each distinct command executed by cron, count how many times it was executed and by how many distinct users.
+  script: human_baselines/cron_complex/multiline_1.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+
+ID: multiline_2 | type: select | query: For each hour of the day (0 through 23), count the total number of cron job command executions.
+  script: human_baselines/cron_complex/multiline_2.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=24 FP=0 FN=0 returned=24 must=24
+
+ID: multiline_3 | type: select | query: For each date, count the number of cron session opens, session closes, and command executions.
+  script: human_baselines/cron_complex/multiline_3.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=26 FP=0 FN=0 returned=26 must=26
+
+ID: multiline_4 | type: select | query: For each cron command, find the maximum elapsed time in seconds between any two consecutive executions of that same command. Floor the result to the nearest whole second (e.g. 900.99s becomes 900). Return the command and the maximum gap. This identifies missed or delayed scheduled executions.
+  script: human_baselines/cron_complex/multiline_4.py
+  precision=0.2500 recall=0.2500 f1=0.2500 TP=1 FP=3 FN=3 returned=4 must=4
+
+ID: multiline_5 | type: select | query: Find cron sessions (by host and process ID) where a session was opened but no command was executed in the same process.
+  script: human_baselines/cron_complex/multiline_5.py
+  precision=0.9998 recall=1.0000 f1=0.9999 TP=4380 FP=1 FN=0 returned=4381 must=4380
+
+ID: multiline_6 | type: select | query: For each distinct command executed by cron, return the earliest and latest execution timestamp text.
+  script: human_baselines/cron_complex/multiline_6.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+
+ID: multiline_7 | type: select | query: For each date and 15-minute time interval, count the number of cron command executions. The interval is represented as minutes since midnight (0, 15, 30, 45, 60, ...). Return only intervals that had at least one execution.
+  script: human_baselines/cron_complex/multiline_7.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2476 FP=0 FN=0 returned=2476 must=2476
+
+ID: multiline_8 | type: select | query: For each host and date, count the number of cron command executions and session opens.
+  script: human_baselines/cron_complex/multiline_8.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=26 FP=0 FN=0 returned=26 must=26
+
+# Macro Averages
+# precision=0.9062 recall=0.9062 f1=0.9062

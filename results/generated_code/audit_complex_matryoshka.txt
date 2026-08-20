@@ -1,0 +1,643 @@
+# Evaluation report generated 20260429-120932
+# Source JSON: queries/audit_complex.json
+# Log file input: data/logs/audit
+# Log file resolved: data/logs/audit
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/audit.json
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each host, count SELinux AVC denial events and the number of distinct denied permissions.
+  requested output format=host,avc_denial_count,distinct_denied_permission_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    filepath = sys.argv[1]
+    
+    # Matches 'node=' taking into account possible prefixes like '#012', '(', etc.
+    node_re = re.compile(r'(?:^|[\s\(\[\{,]|#012)node=([a-zA-Z0-9_\-\.]+)')
+    
+    # Matches standard syslog prefixes (both traditional and ISO 8601) to extract the host
+    # Supports optional log file path prefixes and optional sequence numbers.
+    syslog_re = re.compile(r'^(?:[^:\s]+:\s*)?(?:\d+\s+)?(?:[^\s:]{3,6}\s+\d+\s+\d\d:\d\d:\d\d|20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:[+-]\d\d:\d\d|Z)?)\s+([a-zA-Z0-9_\-\.]+)(?=\s)')
+    
+    # Matches SELinux AVC denied permissions
+    avc_re = re.compile(r'avc:\s*denied\s*\{\s*([^\}]+?)\s*\}')
+    
+    host_stats = {}
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                denials = avc_re.findall(line)
+                if not denials:
+                    continue
+                
+                host = None
+                # node= has highest priority for identifying host in audit trails
+                node_match = node_re.search(line)
+                if node_match:
+                    host = node_match.group(1)
+                else:
+                    # Fall back to syslog header
+                    syslog_match = syslog_re.search(line)
+                    if syslog_match:
+                        host = syslog_match.group(1)
+                        
+                if not host:
+                    continue
+                    
+                if host not in host_stats:
+                    host_stats[host] = {'avc_count': 0, 'permissions': set()}
+                    
+                # A single log line may contain multiple AVC denials (e.g., setroubleshoot concatenated logs)
+                for perms_str in denials:
+                    host_stats[host]['avc_count'] += 1
+                    for p in perms_str.split():
+                        host_stats[host]['permissions'].add(p)
+                        
+    except Exception:
+        pass
+        
+    # Output strictly according to requested semantics:
+    # host avc_denial_count distinct_denied_permission_count
+    for host in sorted(host_stats.keys()):
+        count = host_stats[host]['avc_count']
+        distinct_perms = len(host_stats[host]['permissions'])
+        print(f"{host} {count} {distinct_perms}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.9570 recall=0.9625 f1=0.9598 TP=334 FP=15 FN=13 returned=349 must=347
+  may_precision=0.9570 may_recall=0.9625 may_f1=0.9598 may_TP=334 may_FP=15 may_FN=13 may=347
+  retries=0
+  input_tokens=127359 output_tokens=811
+  elapsed_seconds=142.84
+
+ID: multiline_2 | type: select | query: For each host, count SELinux policy load events and enforcing mode changes.
+  requested output format=host,policy_load_count,enforcing_change_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Regex to capture 'node=<host>' if present
+    node_re = re.compile(r'\bnode=([^\s]+)')
+    
+    # Regex to capture syslog host
+    syslog_re = re.compile(
+        r'^(?:<[0-9]+>)?(?:[/\w\.-]+:)?'  # optional syslog facility/priority or filename
+        r'(?:'
+            r'(?:\d{2}\s+)?[a-zA-Z\.]+\s+\d+\s+\d{2}:\d{2}:\d{2}'  # Traditional syslog date (e.g. Aug 28 14:31:18 or janv. 25 18:34:25)
+            r'|'
+            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?'  # ISO 8601 date
+        r')\s+'
+        r'([^\s:]+)'  # Hostname (avoiding colon)
+        r'\s+'
+        r'(?:kernel|audispd|setroubleshoot|audit_log|klogd|audit|\[)'  # Common process/component headers
+    )
+    
+    # Patterns to identify target events
+    policy_load_re = re.compile(r'\btype=(?:1403|MAC_POLICY_LOAD)\b|\bpolicy loaded\b')
+    enforcing_change_re = re.compile(r'\btype=(?:1404|MAC_STATUS)\b|\benforcing=\d+|\bselinux=\d+')
+
+    # counts[host] = [policy_load_count, enforcing_change_count]
+    counts = defaultdict(lambda: [0, 0])
+    
+    opener = gzip.open if file_path.endswith('.gz') else open
+    with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            is_policy_load = bool(policy_load_re.search(line))
+            is_enforcing_change = bool(enforcing_change_re.search(line))
+            
+            if is_policy_load or is_enforcing_change:
+                host = None
+                m_node = node_re.search(line)
+                if m_node:
+                    host = m_node.group(1).strip('"\'')
+                else:
+                    m_syslog = syslog_re.search(line)
+                    if m_syslog:
+                        host = m_syslog.group(1).strip('"\'')
+                
+                if not host:
+                    host = "unknown"
+                    
+                if is_policy_load:
+                    counts[host][0] += 1
+                if is_enforcing_change:
+                    counts[host][1] += 1
+
+    # Print output formatted as requested: host policy_load_count enforcing_change_count
+    for host, (p_count, e_count) in counts.items():
+        print(f"{host} {p_count} {e_count}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.7645 recall=0.9327 f1=0.8402 TP=831 FP=256 FN=60 returned=1087 must=891
+  may_precision=0.7645 may_recall=0.9327 may_f1=0.8402 may_TP=831 may_FP=256 may_FN=60 may=891
+  retries=0
+  input_tokens=127346 output_tokens=886
+  elapsed_seconds=94.18
+
+ID: multiline_3 | type: select | query: Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.
+  requested output format=host,boolean_name,disable_event_timestamp,enable_event_timestamp
+  requested output data type=string,string,float,float
+  command: import sys
+import re
+import gzip
+
+def extract_host(line):
+    # Node= overrides syslog host
+    node_m = re.search(r'\bnode=([^\s=]+)', line)
+    if node_m:
+        return node_m.group(1)
+        
+    prefix = r'^(?:[A-Za-z_./][^:\s]*:\s*)?(?:<\d+>)?'
+    
+    # Syslog Month DD HH:MM:SS host
+    m1 = re.search(prefix + r'([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+(\S+)', line)
+    if m1:
+        h = m1.group(2)
+        if is_valid_host(h):
+            return h
+            
+    # Syslog ISO8601
+    m2 = re.search(prefix + r'(\d{4}-\d{2}-\d{2}T\S+)\s+(\S+)', line)
+    if m2:
+        h = m2.group(2)
+        if is_valid_host(h):
+            return h
+            
+    # Time-only
+    m3 = re.search(prefix + r'(\d{2}:\d{2}:\d{2})\s+(\S+)', line)
+    if m3:
+        h = m3.group(2)
+        if is_valid_host(h):
+            return h
+
+    return "unknown"
+
+def is_valid_host(h):
+    h_lower = h.lower()
+    if h.startswith('['): 
+        return False
+    if h_lower in ('kernel:', 'audit:', 'kernel', 'audit'): 
+        return False
+    return True
+
+def process_file(file_path):
+    opener = gzip.open if file_path.endswith('.gz') else open
+    
+    # Track disabled booleans: (host, bool_name) -> disable_timestamp
+    disabled_states = {}
+    
+    audit_ts_re = re.compile(r'audit\((\d+\.\d+):\d+\)')
+    
+    try:
+        with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if 'bool=' not in line or 'val=' not in line or 'old_val=' not in line:
+                    continue
+                
+                bool_name, val, old_val = None, None, None
+                m_bool = re.search(r'\bbool=([^\s,]+)', line)
+                if m_bool: bool_name = m_bool.group(1)
+                
+                m_val = re.search(r'\bval=([^\s,]+)', line)
+                if m_val: val = m_val.group(1)
+                
+                m_old = re.search(r'\bold_val=([^\s,]+)', line)
+                if m_old: old_val = m_old.group(1)
+                
+                if not (bool_name and val and old_val):
+                    continue
+                    
+                ts_m = audit_ts_re.search(line)
+                if not ts_m:
+                    continue
+                    
+                timestamp = float(ts_m.group(1))
+                
+                host = extract_host(line)
+                key = (host, bool_name)
+                
+                old_val_lower = old_val.lower()
+                val_lower = val.lower()
+                
+                is_enabled_old = old_val_lower in ('1', 'on', 'true', 'yes')
+                is_disabled_old = old_val_lower in ('0', 'off', 'false', 'no')
+                
+                is_enabled_new = val_lower in ('1', 'on', 'true', 'yes')
+                is_disabled_new = val_lower in ('0', 'off', 'false', 'no')
+                
+                if is_enabled_old and is_disabled_new:
+                    # Changed from enabled to disabled
+                    disabled_states[key] = timestamp
+                elif is_disabled_old and is_enabled_new:
+                    # Changed from disabled to enabled
+                    if key in disabled_states:
+                        disable_ts = disabled_states.pop(key)
+                        print(f"{host} {bool_name} {disable_ts} {timestamp}")
+                        
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=14 FP=0 FN=0 returned=14 must=14
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=14 may_FP=0 may_FN=0 may=14
+  retries=0
+  input_tokens=127449 output_tokens=1170
+  elapsed_seconds=133.05
+
+ID: multiline_4 | type: select | query: For each host and PAM action, count total PAM events and how many of those events ended in failure.
+  requested output format=host,pam_action,pam_event_count,failed_pam_event_count
+  requested output data type=string,string,integer,integer
+  command: import sys
+import re
+import collections
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Regex to extract host from standard syslog formats or prepended tags
+    syslog_re = re.compile(
+        r'^(?:[^:\s]+:\s*)?'                      # Optional prefix like "varlogmessages:"
+        r'(?:'
+            r'[^\s]{3,5}\.?\s+\d+\s+\d\d:\d\d:\d\d'  # Date like 'Aug 24 15:10:01' or 'janv. 25 18:34:25'
+            r'|'
+            r'[\d-]+T[\d:\.\+\-]+(?:Z)?'             # ISO 8601 like '2022-02-28T17:43:00.435570-05:00'
+            r'|'
+            r'\d\d:\d\d:\d\d'                        # Just time like '10:53:24'
+        r')'
+        r'\s+'
+        r'([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*)'     # The host (avoids matching 'kernel:' due to colon)
+        r'\s+'
+    )
+    
+    # Regex to extract explicit node from audit/setroubleshoot messages
+    node_re = re.compile(r'\bnode=([^\s]+)')
+    
+    # Regex to extract PAM action from either op=PAM:xxx or PAM: xxx
+    pam_re = re.compile(r'(?:op=PAM:|PAM:\s+)(.+?)(?=\s+[a-z]+=|\s+:|$)')
+    
+    # Regex to extract outcome/result
+    res_re = re.compile(r'\bres=["\']?([A-Za-z0-9_-]+)["\']?')
+    
+    # stats[(host, action)] = [total, failed]
+    stats = collections.defaultdict(lambda: [0, 0])
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                pam_match = pam_re.search(line)
+                if not pam_match:
+                    continue
+                
+                action = pam_match.group(1).strip().replace(' ', '_')
+                
+                host = None
+                node_match = node_re.search(line)
+                if node_match:
+                    host = node_match.group(1)
+                else:
+                    syslog_match = syslog_re.search(line)
+                    if syslog_match:
+                        host = syslog_match.group(1)
+                
+                if not host:
+                    continue
+                    
+                res_match = res_re.search(line)
+                if not res_match:
+                    continue
+                    
+                outcome = res_match.group(1).lower()
+                is_failed = 1 if outcome in ('failed', 'fail', 'failure', 'no', '0') else 0
+                
+                stats[(host, action)][0] += 1
+                stats[(host, action)][1] += is_failed
+                
+        for (host, action), (total, failed) in stats.items():
+            print(f"{host} {action} {total} {failed}")
+            
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=93 FP=0 FN=0 returned=93 must=93
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=93 may_FP=0 may_FN=0 may=93
+  retries=1
+  input_tokens=254767 output_tokens=2063
+  elapsed_seconds=304.29
+
+ID: multiline_5 | type: select | query: For each source address, count failed SSH authentication attempts recorded by sshd.
+  requested output format=source_address,failed_ssh_attempt_count
+  requested output data type=string,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+
+    filepath = sys.argv[1]
+    counts = defaultdict(int)
+
+    sshd_re = re.compile(r'(?:exe="[^"]*sshd"|comm="sshd")')
+    failed_re = re.compile(r'\bres="?failed"?\b')
+    addr_re = re.compile(r'\baddr="?([^",\s)]+)')
+
+    opener = gzip.open if filepath.endswith('.gz') else open
+    
+    try:
+        with opener(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if failed_re.search(line) and sshd_re.search(line):
+                    addr_match = addr_re.search(line)
+                    if addr_match:
+                        addr = addr_match.group(1)
+                        counts[addr] += 1
+    except Exception:
+        pass
+
+    for addr, count in counts.items():
+        print(f"{addr} {count}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=23 FP=0 FN=0 returned=23 must=23
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=23 may_FP=0 may_FN=0 may=23
+  retries=0
+  input_tokens=127337 output_tokens=321
+  elapsed_seconds=81.71
+
+ID: multiline_6 | type: select | query: For each systemd service unit, count unit start events and unit stop events.
+  requested output format=service_unit,unit_start_count,unit_stop_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def main():
+    starts = defaultdict(int)
+    stops = defaultdict(int)
+
+    # Regex to extract event type for service start and stop events
+    type_re = re.compile(r'\btype=(1130|1131|SERVICE_START|SERVICE_STOP)\b')
+    # Regex to extract the service unit name
+    unit_re = re.compile(r'\bunit=(?:"([^"]+)"|([^ \']+))')
+
+    if len(sys.argv) < 2:
+        return
+
+    filepath = sys.argv[1]
+    
+    # Support both gzipped and plain text files
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    
+    with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            t_m = type_re.search(line)
+            if not t_m:
+                continue
+            
+            u_m = unit_re.search(line)
+            if not u_m:
+                continue
+            
+            event_type = t_m.group(1)
+            unit = u_m.group(1) or u_m.group(2)
+            
+            if event_type in ('1130', 'SERVICE_START'):
+                starts[unit] += 1
+            elif event_type in ('1131', 'SERVICE_STOP'):
+                stops[unit] += 1
+
+    # Combine all unique units and print the results
+    all_units = sorted(set(starts.keys()) | set(stops.keys()))
+    for unit in all_units:
+        print(f"{unit} {starts[unit]} {stops[unit]}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.8166 recall=0.8539 f1=0.8348 TP=187 FP=42 FN=32 returned=229 must=219
+  may_precision=0.8166 may_recall=0.8539 may_f1=0.8348 may_TP=187 may_FP=42 may_FN=32 may=219
+  retries=0
+  input_tokens=127350 output_tokens=482
+  elapsed_seconds=72.95
+
+ID: multiline_7 | type: select | query: For each host, count audit subsystem initialization events and audit daemon process ID set events.
+  requested output format=host,audit_initialized_count,audit_pid_set_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def process_logs(file_path):
+    init_counts = defaultdict(int)
+    pid_set_counts = defaultdict(int)
+    hosts = set()
+
+    # Regexes to extract the host
+    node_re = re.compile(r'\bnode=([^\s\)]+)')
+    daemon_re = re.compile(r'(?:^|\s)(?![\d:]+$)([a-zA-Z0-9\.\-]+)\s+(?:kernel|audispd|setroubleshoot|audit_log|klogd)(?:\[\d+\])?:\s')
+    syslog_re = re.compile(
+        r'^(?:[A-Za-z0-9_\-\.]+:\s*)?'
+        r'(?:'
+        r'(?:\S+\s+){2,3}\d+:\d+:\d+'
+        r'|'
+        r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?'
+        r')\s+'
+        r'([a-zA-Z0-9\.\-]+)\s+'
+    )
+
+    # Regexes to identify requested events
+    type_init_re = re.compile(r'\btype=(?:2000|INITIALIZED)\b', re.IGNORECASE)
+    init_kw_re = re.compile(r'\b(?:state=)?initialized\b', re.IGNORECASE)
+
+    type_pid_re = re.compile(r'\btype=(?:1305|CONFIG_CHANGE)\b', re.IGNORECASE)
+    pid_kw_re = re.compile(r'\baudit_pid=\d+', re.IGNORECASE)
+
+    open_func = gzip.open if file_path.endswith('.gz') else open
+
+    with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            is_init = bool(type_init_re.search(line) and init_kw_re.search(line))
+            is_pid_set = bool(type_pid_re.search(line) and pid_kw_re.search(line))
+
+            if not (is_init or is_pid_set):
+                continue
+
+            host = None
+            # Attempt 1: Extract from node=
+            node_m = node_re.search(line)
+            if node_m:
+                host = node_m.group(1)
+            else:
+                # Attempt 2: Extract just before common daemons
+                daemon_m = daemon_re.search(line)
+                if daemon_m:
+                    host = daemon_m.group(1)
+                else:
+                    # Attempt 3: Extract from standard syslog header
+                    syslog_m = syslog_re.search(line)
+                    if syslog_m:
+                        h = syslog_m.group(1)
+                        if h not in ('kernel', 'audispd', 'setroubleshoot', 'audit_log', 'klogd'):
+                            host = h
+
+            if not host:
+                host = 'unknown'
+
+            hosts.add(host)
+            if is_init:
+                init_counts[host] += 1
+            if is_pid_set:
+                pid_set_counts[host] += 1
+
+    for host in sorted(hosts):
+        print(f"{host} {init_counts[host]} {pid_set_counts[host]}")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=0.9940 recall=0.9940 f1=0.9940 TP=1152 FP=7 FN=7 returned=1159 must=1159
+  may_precision=0.9940 may_recall=0.9940 may_f1=0.9940 may_TP=1152 may_FP=7 may_FN=7 may=1159
+  retries=1
+  input_tokens=254735 output_tokens=1628
+  elapsed_seconds=177.95
+
+ID: multiline_8 | type: select | query: For each executable path and signal number, count crash signal events.
+  requested output format=executable_path,signal_number,crash_event_count
+  requested output data type=string,string,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def get_syslog_host(line):
+    # Extract syslog host if present
+    m = re.match(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)', line)
+    if m: return m.group(1)
+    m = re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?\s+(\S+)', line)
+    if m: return m.group(1)
+    return None
+
+def process_audit_logs(file_path):
+    tx_store = defaultdict(lambda: {'exe': None, 'sigs': set()})
+    
+    tx_re = re.compile(r'audit\((?P<tx>\d+(?:\.\d+)?:[0-9]+)\)')
+    exe_re = re.compile(r'\bexe=(?:"([^"]+)"|([^\s]+))')
+    type_re = re.compile(r'\btype=([A-Za-z_0-9]+)')
+    sig_re = re.compile(r'\bsig=(\d+)')
+    pid_re = re.compile(r'\bpid=(\d+)')
+    node_re = re.compile(r'\bnode=([^\s]+)')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for raw_line in f:
+                syslog_host = get_syslog_host(raw_line)
+                
+                # Handle lines packed by setroubleshoot with #012 (newline placeholder)
+                for line in raw_line.split('#012'):
+                    tx_match = tx_re.search(line)
+                    if tx_match:
+                        tx_id = tx_match.group('tx')
+                    else:
+                        # Fallback to PID if transaction ID is missing entirely
+                        pid_match = pid_re.search(line)
+                        if pid_match:
+                            tx_id = f"pid_{pid_match.group(1)}"
+                        else:
+                            continue
+                            
+                    node_match = node_re.search(line)
+                    client = ""
+                    if node_match:
+                        client = node_match.group(1)
+                    elif syslog_host:
+                        client = syslog_host
+                        
+                    key = (client, tx_id)
+                    
+                    # Extract executable path
+                    em = exe_re.search(line)
+                    if em:
+                        exe_val = em.group(1) if em.group(1) is not None else em.group(2)
+                        if exe_val not in ('?', '(null)', '""', "''"):
+                            tx_store[key]['exe'] = exe_val
+                            
+                    # Check for crash signal events (ANOM_ABEND or 1701)
+                    tm = type_re.search(line)
+                    if tm:
+                        etype = tm.group(1)
+                        if etype in ('1701', 'ANOM_ABEND'):
+                            sm = sig_re.search(line)
+                            if sm:
+                                tx_store[key]['sigs'].add(sm.group(1))
+                                
+    except Exception:
+        pass
+        
+    counts = defaultdict(int)
+    for key, data in tx_store.items():
+        exe = data['exe']
+        if not exe:
+            continue
+        for sig in data['sigs']:
+            counts[(exe, sig)] += 1
+            
+    for (exe, sig) in sorted(counts.keys()):
+        print(f"{exe} {sig} {counts[(exe, sig)]}")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_audit_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=8 FP=0 FN=0 returned=8 must=8
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=8 may_FP=0 may_FN=0 may=8
+  retries=0
+  input_tokens=127343 output_tokens=1033
+  elapsed_seconds=175.99
+
+# Macro Averages (where/select queries)
+# precision=0.9415 recall=0.9679 f1=0.9536
+# may_precision=0.9415 may_recall=0.9679 may_f1=0.9536
+# retries_total=2 retries_avg=0.25
+# total_input_tokens=1273686 total_output_tokens=8394
+# total_elapsed=1182.96s avg_elapsed=147.87s
+# Worst 5 queries by f1
+# 1. multiline_6 | type: select | f1=0.8348 | query: For each systemd service unit, count unit start events and unit stop events.
+# 2. multiline_2 | type: select | f1=0.8402 | query: For each host, count SELinux policy load events and enforcing mode changes.
+# 3. multiline_1 | type: select | f1=0.9598 | query: For each host, count SELinux AVC denial events and the number of distinct denied permissions.
+# 4. multiline_7 | type: select | f1=0.9940 | query: For each host, count audit subsystem initialization events and audit daemon process ID set events.
+# 5. multiline_3 | type: select | f1=1.0000 | query: Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.

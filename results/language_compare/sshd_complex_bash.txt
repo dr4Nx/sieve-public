@@ -1,0 +1,688 @@
+# Evaluation report generated 20260429-141250
+# Source JSON: queries/sshd_complex.json
+# Log file input: data/logs/sshd
+# Log file resolved: data/logs/sshd
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/sshd.json
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+  requested output format=source_ip,failure_count,distinct_usernames_targeted
+  requested output data type=string,integer,integer
+  command: awk '
+# Awk script to parse sshd logs and count failed authentication events per IP
+BEGIN {
+    # No header required by user
+}
+{
+    pid = ""
+    ip = ""
+    user = ""
+    count = 0
+
+    # Extract PID for IP mapping
+    for (i = 1; i <= NF; i++) {
+        if (match($i, /^sshd/)) {
+            start = index($i, "[")
+            end = index($i, "]")
+            if (start > 0 && end > start) {
+                pid = substr($i, start + 1, end - start - 1)
+            }
+            break
+        }
+    }
+
+    # Extract IP for PID mapping
+    for (i = 1; i <= NF; i++) {
+        if ($i == "from" || $i == "by") {
+            if ($(i-1) == "Connection") {
+                if (pid != "") pid_ip[pid] = $(i+1)
+            } else if ($(i-2) == "Connection" && $(i-1) == "closed") {
+                if (pid != "") pid_ip[pid] = $(i+1)
+            }
+        } else if ($i == "Address" && $(i+2) == "maps") {
+            if (pid != "") pid_ip[pid] = $(i+1)
+        } else if (match($i, /^rhost=/)) {
+            val = substr($i, 7)
+            if (val != "") {
+                if (pid != "") pid_ip[pid] = val
+            }
+        }
+    }
+
+    # Extract authentication failures
+    for (i = 1; i <= NF; i++) {
+        if ($i == "Failed" && $(i+2) == "for") {
+            if ($(i+3) == "invalid" && $(i+4) == "user") {
+                user = $(i+5)
+                if ($(i+6) == "from") ip = $(i+7)
+            } else {
+                user = $(i+3)
+                if ($(i+4) == "from") ip = $(i+5)
+            }
+            count = 1
+            break
+        }
+        else if ($i == "Invalid" && $(i+1) == "user") {
+            user = $(i+2)
+            if ($(i+3) == "from") ip = $(i+4)
+            count = 1
+            break
+        }
+        else if ($i == "User" && $(i+2) == "from" && $(i+4) == "not" && $(i+5) == "allowed") {
+            user = $(i+1)
+            ip = $(i+3)
+            count = 1
+            break
+        }
+        else if ($i == "error:" && $(i+1) == "PAM:" && $(i+2) == "Authentication" && $(i+3) == "failure") {
+            if ($(i+4) == "for") {
+                user = $(i+5)
+                if ($(i+6) == "from") ip = $(i+7)
+            }
+            count = 1
+            break
+        }
+        else if ($i == "authentication" && $(i+1) == "failure;") {
+            count = 1
+            for (j = i; j <= NF; j++) {
+                if (match($j, /^rhost=/)) {
+                    ip = substr($j, 7)
+                } else if (match($j, /^user=/)) {
+                    user = substr($j, 6)
+                }
+            }
+            break
+        }
+        else if ($(i+1) == "more" && $(i+2) == "authentication") {
+            if ($i ~ /^[0-9]+$/) {
+                count = $i
+                for (j = i; j <= NF; j++) {
+                    if (match($j, /^rhost=/)) {
+                        ip = substr($j, 7)
+                    } else if (match($j, /^user=/)) {
+                        user = substr($j, 6)
+                    }
+                }
+                break
+            }
+        }
+        else if ($i == "bad" && $(i+1) == "username") {
+            start = index($(i+2), "[")
+            end = index($(i+2), "]")
+            if (start > 0 && end > start) {
+                user = substr($(i+2), start + 1, end - start - 1)
+            }
+            count = 1
+            break
+        }
+    }
+
+    # Tally up the counts
+    if (count > 0) {
+        if (ip == "" && pid != "" && pid_ip[pid] != "") {
+            ip = pid_ip[pid]
+        }
+        if (ip != "") {
+            failures[ip] += count
+            if (user != "") {
+                if (!seen_users[ip SUBSEP user]) {
+                    seen_users[ip SUBSEP user] = 1
+                    dist_users[ip]++
+                }
+            }
+        }
+    }
+}
+END {
+    for (ip in failures) {
+        print ip, failures[ip], dist_users[ip] + 0
+    }
+}' data/logs/sshd
+  precision=0.7766 recall=0.9012 f1=0.8343 TP=73 FP=21 FN=8 returned=94 must=81
+  may_precision=0.7766 may_recall=0.9012 may_f1=0.8343 may_TP=73 may_FP=21 may_FN=8 may=81
+  retries=0
+  input_tokens=15578 output_tokens=1325
+  elapsed_seconds=206.23
+
+ID: multiline_2 | type: select | query: Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.
+  requested output format=source_ip,peak_failures_in_5min
+  requested output data type=string,integer
+  command: awk '
+BEGIN {
+    # Mapping for English month abbreviations to numeric values
+    map["jan"]=1; map["feb"]=2; map["mar"]=3; map["apr"]=4;
+    map["may"]=5; map["jun"]=6; map["jul"]=7; map["aug"]=8;
+    map["sep"]=9; map["oct"]=10; map["nov"]=11; map["dec"]=12;
+    
+    # Cumulative days before each month (assuming year 2000, which is a leap year)
+    mdays[1]=0; mdays[2]=31; mdays[3]=60; mdays[4]=91; mdays[5]=121; mdays[6]=152;
+    mdays[7]=182; mdays[8]=213; mdays[9]=244; mdays[10]=274; mdays[11]=305; mdays[12]=335;
+}
+{
+    ip = ""
+    is_sshd = 0
+    is_pam = 0
+    fail_count = 0
+
+    # 1. Match sshd interactive failures (password, none, publickey, etc.)
+    if ($0 ~ /Failed [^ ]+ for /) {
+        for (i=1; i<=NF; i++) {
+            if ($i == "from") {
+                ip = $(i+1)
+                is_sshd = 1
+                fail_count = 1
+            }
+        }
+    # 2. Match PAM direct authentication failure errors
+    } else if ($0 ~ /PAM: Authentication failure/) {
+        for (i=1; i<=NF; i++) {
+            if ($i == "from") {
+                ip = $(i+1)
+                is_pam = 1
+                fail_count = 1
+            }
+        }
+    # 3. Match standard pam_unix authentication failure logs
+    } else if ($0 ~ /authentication failure;/) {
+        if (match($0, /rhost=[^ ]+/)) {
+            ip = substr($0, RSTART+6, RLENGTH-6)
+            is_pam = 1
+            fail_count = 1
+        }
+    # 4. Match PAM aggregated "N more" failures
+    } else if ($0 ~ /more authentication failure/) {
+        if (match($0, /rhost=[^ ]+/)) {
+            ip = substr($0, RSTART+6, RLENGTH-6)
+            is_pam = 1
+            if (match($0, /[0-9]+ more authentication failure/)) {
+                cstr = substr($0, RSTART, RLENGTH)
+                sub(/ .*/, "", cstr)
+                fail_count = cstr + 0
+            } else {
+                fail_count = 1
+            }
+        }
+    }
+
+    if (ip != "") {
+        # Parse timestamp: month
+        m_str = tolower(substr($1, 1, 3))
+        m = map[m_str]
+        if (!m) {
+            if ($1 ~ /[0-9]+/) {
+                match($1, /[0-9]+/)
+                m = substr($1, RSTART, RLENGTH) + 0
+            } else {
+                m = 1
+            }
+        }
+        
+        # Parse timestamp: day and time
+        d = $2 + 0
+        split($3, t, ":")
+        # Convert to continuous seconds since start of year (ignores year rollover)
+        ts = (mdays[m] + d - 1) * 86400 + t[1] * 3600 + t[2] * 60 + t[3]
+        
+        # Extract Host and PID for deduplicating overlapping PAM and sshd logs for the same connection
+        host = $4
+        match($5, /[0-9]+/)
+        pid = RLENGTH > 0 ? substr($5, RSTART, RLENGTH) : "unknown"
+        
+        # Key uniquely identifies a connection to prevent cross-connection pollution if PID is reused
+        key = host ":" pid
+        if (key in last_ts && ts - last_ts[key] > 3600) {
+            conn_id[key]++
+        }
+        last_ts[key] = ts
+        full_key = key ":" (conn_id[key] + 0)
+        
+        if (!(full_key in conn_ip)) {
+            conn_ip[full_key] = ip
+            conn_ts[full_key] = ts
+        }
+        if (is_sshd) conn_sshd[full_key] += fail_count
+        if (is_pam) conn_pam[full_key] += fail_count
+    }
+}
+END {
+    # Aggregate failures per connection, taking max of sshd or pam to prevent double-counting
+    for (full_key in conn_ip) {
+        ip = conn_ip[full_key]
+        ts = conn_ts[full_key]
+        s_fails = conn_sshd[full_key] + 0
+        p_fails = conn_pam[full_key] + 0
+        fails = s_fails > p_fails ? s_fails : p_fails
+        
+        if (fails > 0) {
+            ip_count[ip]++
+            ip_ts[ip, ip_count[ip]] = ts
+            ip_val[ip, ip_count[ip]] = fails
+        }
+    }
+
+    # Process sliding windows per IP
+    for (ip in ip_count) {
+        n = ip_count[ip]
+        
+        # Insertion sort chronological ordering for safety
+        for (i = 2; i <= n; i++) {
+            key_ts = ip_ts[ip, i]
+            key_val = ip_val[ip, i]
+            j = i - 1
+            while (j >= 1 && ip_ts[ip, j] > key_ts) {
+                ip_ts[ip, j+1] = ip_ts[ip, j]
+                ip_val[ip, j+1] = ip_val[ip, j]
+                j--
+            }
+            ip_ts[ip, j+1] = key_ts
+            ip_val[ip, j+1] = key_val
+        }
+        
+        # Find max failures within any 300 second (5 min) window
+        max_failures = 0
+        for (i = 1; i <= n; i++) {
+            current = 0
+            for (j = i; j <= n; j++) {
+                if (ip_ts[ip, j] - ip_ts[ip, i] <= 300) {
+                    current += ip_val[ip, j]
+                } else {
+                    break
+                }
+            }
+            if (current > max_failures) {
+                max_failures = current
+            }
+        }
+        
+        # Output requested format (source IP and peak failures over threshold)
+        if (max_failures >= 10) {
+            print ip, max_failures
+        }
+    }
+}' data/logs/sshd
+  precision=0.9375 recall=0.9375 f1=0.9375 TP=15 FP=1 FN=1 returned=16 must=16
+  may_precision=0.9375 may_recall=0.9375 may_f1=0.9375 may_TP=15 may_FP=1 may_FN=1 may=16
+  retries=0
+  input_tokens=15570 output_tokens=1819
+  elapsed_seconds=199.41
+
+ID: multiline_3 | type: select | query: Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.
+  requested output format=source_ip,distinct_usernames
+  requested output data type=string,integer
+  command: awk '
+# Initialize variables for each log line
+{
+    ip = ""
+    user = ""
+    
+    # Match standard and PAM authentication failures containing rhost and user
+    if ($0 ~ /[Aa]uthentication failure/ && $0 ~ /rhost=/) {
+        for (i=1; i<=NF; i++) {
+            if ($i ~ /^rhost=/) {
+                ip = substr($i, 7)
+            } else if ($i ~ /^user=/) {
+                user = substr($i, 6)
+            }
+        }
+    } 
+    # Match specific PAM error format
+    else if ($0 ~ /error: PAM: Authentication failure for/) {
+        for (i=1; i<=NF; i++) {
+            if ($i == "failure" && $(i+1) == "for") {
+                user = $(i+2)
+                if ($(i+3) == "from") ip = $(i+4)
+                break
+            }
+        }
+    } 
+    # Match Failed password/publickey etc. for valid/invalid users
+    else if ($0 ~ /Failed [^ ]+ for /) {
+        for (i=1; i<=NF; i++) {
+            if ($i == "Failed" && $(i+2) == "for") {
+                # Check if it specifies "invalid user"
+                if ($(i+3) == "invalid" && $(i+4) == "user") {
+                    user = $(i+5)
+                    if ($(i+6) == "from") ip = $(i+7)
+                } else {
+                    user = $(i+3)
+                    if ($(i+4) == "from") ip = $(i+5)
+                }
+                break
+            }
+        }
+    } 
+    # Match Invalid user attempts
+    else if ($0 ~ /Invalid user /) {
+        for (i=1; i<=NF; i++) {
+            if ($i == "Invalid" && $(i+1) == "user") {
+                user = $(i+2)
+                if ($(i+3) == "from") ip = $(i+4)
+                break
+            }
+        }
+    } 
+    # Match User not allowed by config
+    else if ($0 ~ /not allowed because not listed in/) {
+        for (i=1; i<=NF; i++) {
+            if ($i == "User" && $(i+2) == "from") {
+                user = $(i+1)
+                ip = $(i+3)
+                break
+            }
+        }
+    }
+    
+    # If we successfully extracted both IP and user, track distinct combinations
+    if (ip != "" && user != "") {
+        # Clean up possible trailing carriage returns just in case
+        sub(/\r$/, "", ip)
+        sub(/\r$/, "", user)
+        
+        # Count distinct users per IP
+        if (!seen[ip, user]) {
+            seen[ip, user] = 1
+            counts[ip]++
+        }
+    }
+}
+# After processing all lines, print IPs with 5 or more distinct failed users
+END {
+    for (ip in counts) {
+        if (counts[ip] >= 5) {
+            print ip, counts[ip]
+        }
+    }
+}' data/logs/sshd
+  precision=0.9000 recall=0.9000 f1=0.9000 TP=9 FP=1 FN=1 returned=10 must=10
+  may_precision=0.9000 may_recall=0.9000 may_f1=0.9000 may_TP=9 may_FP=1 may_FN=1 may=10
+  retries=0
+  input_tokens=15550 output_tokens=826
+  elapsed_seconds=140.94
+
+ID: multiline_4 | type: select | query: Find users who had successful SSH logins from two different source IP addresses within 60 seconds of each other. Assume year 2000 for timestamps. Return the username and the two IP addresses.
+  requested output format=username,first_ip,second_ip
+  requested output data type=string,string,string
+  command: awk '
+{
+    for (i=1; i<=NF-4; i++) {
+        if ($i == "Accepted" && $(i+2) == "for" && $(i+4) == "from") {
+            mon = $1
+            m = 0
+            if(mon~/[Jj]an/) m=1
+            else if(mon~/[Ff]eb/) m=2
+            else if(mon~/[Mm]ar/) m=3
+            else if(mon~/[Aa]pr/) m=4
+            else if(mon~/[Mm]ay/) m=5
+            else if(mon~/[Jj]un/) m=6
+            else if(mon~/[Jj]ul/) m=7
+            else if(mon~/[Aa]ug/) m=8
+            else if(mon~/[Ss]ep/) m=9
+            else if(mon~/[Oo]ct/) m=10
+            else if(mon~/[Nn]ov/) m=11
+            else if(mon~/[Dd]ec/) m=12
+            
+            if (m > 0) {
+                day = $2
+                time = $3
+                gsub(/:/, " ", time)
+                ts = mktime("2000 " m " " day " " time)
+                
+                user = $(i+3)
+                ip = $(i+5)
+                
+                c = ++count[user]
+                u_ip[user, c] = ip
+                u_ts[user, c] = ts
+                
+                for (j = c - 1; j >= 1; j--) {
+                    diff = ts - u_ts[user, j]
+                    if (diff > 3600) break
+                    if (diff <= 60 && diff >= -60) {
+                        if (u_ip[user, j] != ip) {
+                            p1 = user " " u_ip[user, j] " " ip
+                            p2 = user " " ip " " u_ip[user, j]
+                            if (!seen[p1]) {
+                                print p1
+                                seen[p1] = 1
+                                seen[p2] = 1
+                            }
+                        }
+                    }
+                }
+            }
+            break
+        }
+    }
+}' data/logs/sshd
+  precision=1.0000 recall=0.7778 f1=0.8750 TP=14 FP=0 FN=4 returned=14 must=18
+  may_precision=1.0000 may_recall=0.7778 may_f1=0.8750 may_TP=14 may_FP=0 may_FN=4 may=18
+  retries=0
+  input_tokens=15556 output_tokens=594
+  elapsed_seconds=91.3
+
+ID: multiline_5 | type: select | query: For each host, count SSH session opens and session closes, and compute the number of unclosed sessions (opens minus closes).
+  requested output format=host,session_opens,session_closes,unclosed_sessions
+  requested output data type=string,integer,integer,integer
+  command: awk '
+# Track session opens
+/: session opened for user / {
+    opens[$4]++
+    hosts[$4] = 1
+}
+# Track session closes
+/: session closed for user / {
+    closes[$4]++
+    hosts[$4] = 1
+}
+# Print summary per host
+END {
+    for (h in hosts) {
+        o = opens[h] + 0
+        c = closes[h] + 0
+        print h, o, c, o - c
+    }
+}' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=123 FP=0 FN=0 returned=123 must=123
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=123 may_FP=0 may_FN=0 may=123
+  retries=0
+  input_tokens=15554 output_tokens=166
+  elapsed_seconds=65.23
+
+ID: multiline_6 | type: select | query: For each source IP, count the number of failed SSH authentication events that specifically targeted the root account. Exclude connection-level events where no authentication was attempted.
+  requested output format=source_ip,root_failure_count
+  requested output data type=string,integer
+  command: awk '
+{
+    ip = ""
+    if ($0 ~ /authentication failures?;/ && $0 ~ /user=root( |$)/) {
+        if (match($0, /rhost=[^ ]+/)) {
+            ip = substr($0, RSTART+6, RLENGTH-6)
+        }
+    } else if ($0 ~ /error: PAM: Authentication failure for root from /) {
+        if (match($0, /from [^ ]+/)) {
+            ip = substr($0, RSTART+5, RLENGTH-5)
+        }
+    } else if ($0 ~ /Failed [^ ]+ for (invalid user )?root from /) {
+        if (match($0, /from [^ ]+/)) {
+            ip = substr($0, RSTART+5, RLENGTH-5)
+        }
+    }
+
+    if (ip != "") {
+        counts[ip]++
+    }
+}
+END {
+    for (ip in counts) {
+        print ip, counts[ip]
+    }
+}' data/logs/sshd
+  precision=0.9565 recall=0.9778 f1=0.9670 TP=44 FP=2 FN=1 returned=46 must=45
+  may_precision=0.9565 may_recall=0.9778 may_f1=0.9670 may_TP=44 may_FP=2 may_FN=1 may=45
+  retries=0
+  input_tokens=15543 output_tokens=281
+  elapsed_seconds=94.72
+
+ID: multiline_7 | type: select | query: For each host and username with successful SSH logins, count the total logins and the number of distinct key fingerprints used. Only count 'Accepted' login events, not session events.
+  requested output format=host,username,login_count,distinct_key_count
+  requested output data type=string,string,integer,integer
+  command: awk '
+# Match lines with Accepted
+/Accepted / {
+    for (i = 1; i <= NF; i++) {
+        # Find the exact pattern: Accepted <method> for <user>
+        if ($i == "Accepted" && $(i+2) == "for") {
+            h = ""
+            # Search backwards for the process name (e.g. sshd[PID]:)
+            for (k = i - 1; k >= 2; k--) {
+                if ($k ~ /sshd/) {
+                    h = $(k-1)
+                    break
+                }
+            }
+            # Fallback to standard syslog host field
+            if (h == "") h = $4
+            
+            u = $(i+3)
+            f = ""
+            # Search forward for ssh2: to extract fingerprint
+            for (j = i + 4; j <= NF; j++) {
+                if ($j == "ssh2:") {
+                    # Handle both cases: with or without key algorithm
+                    if (j + 1 <= NF && $(j+1) ~ /:/) {
+                        f = $(j+1)
+                    } else if (j + 2 <= NF) {
+                        f = $(j+2)
+                    }
+                    break
+                }
+            }
+            
+            # Increment login count
+            lc[h, u]++
+            # Track distinct key fingerprints
+            if (f != "") {
+                if (!seen[h, u, f]) {
+                    seen[h, u, f] = 1
+                    fc[h, u]++
+                }
+            }
+            break
+        }
+    }
+}
+END {
+    # Print results in exact requested order
+    for (k in lc) {
+        split(k, a, SUBSEP)
+        print a[1], a[2], lc[k], fc[k] + 0
+    }
+}' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=36 FP=0 FN=0 returned=36 must=36
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=36 may_FP=0 may_FN=0 may=36
+  retries=0
+  input_tokens=15562 output_tokens=498
+  elapsed_seconds=132.7
+
+ID: multiline_8 | type: select | query: For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+  requested output format=host,distinct_attacker_ips,distinct_legitimate_ips
+  requested output data type=string,integer,integer
+  command: awk '
+{
+    host = $4
+    
+    # Extract PID to map IP across lines (e.g., for PAM logs missing IP)
+    pid = ""
+    if (match($0, /sshd(\[[0-9]+\]|\([^)]+\)\[[0-9]+\]):/)) {
+        s = substr($0, RSTART, RLENGTH)
+        match(s, /\[[0-9]+\]/)
+        pid = substr(s, RSTART + 1, RLENGTH - 2)
+    }
+
+    # Extract source IP explicitly from known line formats
+    ip = ""
+    if (match($0, /from [^ ]+/)) {
+        ip = substr($0, RSTART + 5, RLENGTH - 5)
+        # Remove trailing colon if attached (e.g., from disconnect messages)
+        sub(/:$/, "", ip)
+    } else if (match($0, /rhost=[^ ]+/)) {
+        ip = substr($0, RSTART + 6, RLENGTH - 6)
+    } else if (match($0, /Connection (from|closed by) [^ ]+/)) {
+        s = substr($0, RSTART, RLENGTH)
+        n = split(s, arr, " ")
+        ip = arr[n]
+    } else if (match($0, /Address [^ ]+ maps to/)) {
+        ip = substr($0, RSTART + 8, RLENGTH - 16)
+    }
+
+    # Record PID to IP mapping to handle logs that omit IP (like invalid user requests)
+    if (ip != "" && pid != "") {
+        pid_ip[host, pid] = ip
+    }
+
+    # Detect explicit authentication events (ignores port scans/resets by design)
+    is_fail = 0
+    is_succ = 0
+    
+    if ($0 ~ /[Aa]uthentication failure/ || $0 ~ /Failed [^ ]+ for / || $0 ~ /[Ii]nvalid user / || $0 ~ /not allowed because/ || $0 ~ /bad username/) {
+        is_fail = 1
+    } else if ($0 ~ /Accepted [^ ]+ for / || $0 ~ /authentication success/ || $0 ~ /authentication accepted/ || $0 ~ /session opened/) {
+        is_succ = 1
+    }
+
+    # Attribute the authentication event to the IP
+    if (is_fail || is_succ) {
+        event_ip = ip
+        if (event_ip == "" && pid != "") {
+            event_ip = pid_ip[host, pid]
+        }
+        
+        if (event_ip != "") {
+            if (is_fail) fail_ips[host, event_ip] = 1
+            if (is_succ) succ_ips[host, event_ip] = 1
+        }
+    }
+}
+END {
+    # Aggregate distinct IPs per host
+    for (idx in fail_ips) {
+        split(idx, arr, SUBSEP)
+        hosts[arr[1]] = 1
+        fails[arr[1]]++
+    }
+    for (idx in succ_ips) {
+        split(idx, arr, SUBSEP)
+        hosts[arr[1]] = 1
+        succs[arr[1]]++
+    }
+    
+    # Output: host distinct_attacker_ips distinct_legitimate_ips
+    for (h in hosts) {
+        if (h == "") continue
+        fc = fails[h] + 0
+        sc = succs[h] + 0
+        print h, fc, sc
+    }
+}' data/logs/sshd
+  precision=0.7059 recall=0.7385 f1=0.7218 TP=48 FP=20 FN=17 returned=68 must=65
+  may_precision=0.7059 may_recall=0.7385 may_f1=0.7218 may_TP=48 may_FP=20 may_FN=17 may=65
+  retries=0
+  input_tokens=15577 output_tokens=918
+  elapsed_seconds=153.77
+
+# Macro Averages (where/select queries)
+# precision=0.9096 recall=0.9041 f1=0.9045
+# may_precision=0.9096 may_recall=0.9041 may_f1=0.9045
+# retries_total=0 retries_avg=0.00
+# total_input_tokens=124490 total_output_tokens=6427
+# total_elapsed=1084.30s avg_elapsed=135.54s
+# Worst 5 queries by f1
+# 1. multiline_8 | type: select | f1=0.7218 | query: For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+# 2. multiline_1 | type: select | f1=0.8343 | query: For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+# 3. multiline_4 | type: select | f1=0.8750 | query: Find users who had successful SSH logins from two different source IP addresses within 60 seconds of each other. Assume year 2000 for timestamps. Return the username and the two IP addresses.
+# 4. multiline_3 | type: select | f1=0.9000 | query: Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.
+# 5. multiline_2 | type: select | f1=0.9375 | query: Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.

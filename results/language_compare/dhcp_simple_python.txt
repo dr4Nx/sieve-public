@@ -1,0 +1,1204 @@
+# Evaluation report generated 20260429-143308
+# Source JSON: queries/dhcp_simple.json
+# Log file input: data/logs/dhcp
+# Log file resolved: data/logs/dhcp
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/dhcp_v2.json
+# Queries evaluated: 32
+
+ID: dhcp_query_1 | type: where | query: Return lines assigning an IP to host laphroaig
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if 'bound to' in line and 'laphroaig' in line:
+                tokens = line.split()
+                host = None
+                for i, token in enumerate(tokens):
+                    if token.startswith('dhclient'):
+                        if i > 0:
+                            host = tokens[i-1]
+                        break
+                
+                if host == 'laphroaig':
+                    sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=23 FP=0 FN=0 returned=23 must=23
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=23 may_FP=0 may_FN=0 may=23
+  retries=0
+  input_tokens=20219 output_tokens=215
+  elapsed_seconds=39.71
+
+ID: dhcp_query_2 | type: where | query: Return log lines reporting DHCP server IP addresses that are not broadcast addresses
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import ipaddress
+
+def process_logs():
+    if len(sys.argv) < 2:
+        return
+        
+    log_file = sys.argv[1]
+    
+    # Regex identifies the destination or source IP of a DHCP message to/from a server.
+    pattern = re.compile(
+        r'\b(?:DHCPREQUEST|DHCPDISCOVER|DHCPDECLINE|DHCPRELEASE|DHCPINFORM)\s+on\s+\S+\s+to\s+([0-9a-fA-F:\.]+)\s+port\b'
+        r'|\b(?:DHCPACK|DHCPOFFER|DHCPNAK)\s+from\s+([0-9a-fA-F:\.]+)'
+        r'|\bRCV:\s+\w+\s+message\s+on\s+\S+\s+from\s+([0-9a-fA-F:\.]+)'
+    )
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                for match in pattern.finditer(line):
+                    ip_str = match.group(1) or match.group(2) or match.group(3)
+                    if not ip_str:
+                        continue
+                        
+                    ip_str = ip_str.rstrip('.')
+                    
+                    try:
+                        ip_obj = ipaddress.ip_address(ip_str)
+                        
+                        # Filter out broadcast / multicast addresses
+                        if ip_obj.version == 4:
+                            if str(ip_obj) == '255.255.255.255':
+                                continue
+                        elif ip_obj.version == 6:
+                            if ip_obj.is_multicast:
+                                continue
+                                
+                        # Found a valid non-broadcast DHCP server IP
+                        print(line, end='')
+                        break
+                    except ValueError:
+                        # Not a properly formatted IP address, ignore and continue
+                        pass
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    process_logs()
+  precision=1.0000 recall=0.9994 f1=0.9997 TP=152591 FP=0 FN=99 returned=152591 must=152690
+  may_precision=1.0000 may_recall=0.9994 may_f1=0.9997 may_TP=152591 may_FP=0 may_FN=99 may=152690
+  retries=0
+  input_tokens=20221 output_tokens=556
+  elapsed_seconds=110.39
+
+ID: dhcp_query_3 | type: where | query: Return all log lines for transaction ID 0x6520bf0e
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import os
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    if not os.path.exists(file_path):
+        return
+        
+    target_xid = "0x6520bf0e".lower()
+    target_pattern = re.compile(r'\b' + re.escape(target_xid) + r'\b', re.IGNORECASE)
+
+    line_pattern = re.compile(
+        r'^(?:<\d+>)?(?:[A-Z][a-z]{2}\s+\d+(?:\s+\d{4})?\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.Z+-]+)(?:\s+(?P<host>\S+))?\s+dhclient(?:\[(?P<pid>\d+)\])?:\s+(?P<msg>.*)$'
+    )
+    xid_pattern = re.compile(r'\bxid=(0x[0-9a-fA-F]+)\b', re.IGNORECASE)
+
+    sessions = {}
+    valid_indices = set()
+
+    def end_session(key, end_idx):
+        sess = sessions.pop(key, None)
+        if sess and sess['xid'] == target_xid:
+            valid_indices.update(range(sess['start'], end_idx + 1))
+
+    terminal_phrases = [
+        "bound to",
+        "bound:",
+        "exiting.",
+        "initiating shutdown.",
+        "No DHCPOFFERS received.",
+        "No working leases",
+        "rebind",
+        "No broadcast interfaces found",
+        "already running"
+    ]
+    
+    startup_phrases = [
+        "Internet Systems Consortium DHCP Client",
+        "Copyright "
+    ]
+
+    open_func = gzip.open if file_path.endswith('.gz') else open
+
+    idx = -1
+    with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+        for idx, line in enumerate(f):
+            if target_pattern.search(line):
+                valid_indices.add(idx)
+                
+            m = line_pattern.search(line)
+            xid_match = xid_pattern.search(line)
+            xid = xid_match.group(1).lower() if xid_match else None
+            
+            if not m:
+                continue
+                
+            host = m.group('host')
+            pid = m.group('pid')
+            msg = m.group('msg')
+            key = (host, pid)
+            
+            if any(phrase in msg for phrase in startup_phrases):
+                if key in sessions:
+                    end_session(key, idx - 1)
+                sessions[key] = {'start': idx, 'xid': xid}
+            elif key not in sessions:
+                sessions[key] = {'start': idx, 'xid': xid}
+            else:
+                if xid and sessions[key]['xid'] and xid != sessions[key]['xid']:
+                    end_session(key, idx - 1)
+                    sessions[key] = {'start': idx, 'xid': xid}
+                elif xid and not sessions[key]['xid']:
+                    sessions[key]['xid'] = xid
+                    
+            if any(phrase in msg for phrase in terminal_phrases):
+                end_session(key, idx)
+                
+    for key in list(sessions.keys()):
+        end_session(key, idx)
+        
+    if not valid_indices:
+        return
+
+    with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+        for idx, line in enumerate(f):
+            if idx in valid_indices:
+                sys.stdout.write(line)
+
+if __name__ == "__main__":
+    main()
+  precision=0.2821 recall=1.0000 f1=0.4400 TP=4100 FP=10435 FN=0 returned=14535 must=4100
+  may_precision=0.2821 may_recall=1.0000 may_f1=0.4400 may_TP=4100 may_FP=10435 may_FN=0 may=4100
+  retries=1
+  input_tokens=40483 output_tokens=2219
+  elapsed_seconds=320.68
+
+ID: dhcp_query_4 | type: where | query: Get all lines reporting MAC addresses for host laphroaig
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_file(file_path):
+    host_pattern = re.compile(r'^(?:<\d+>)?\s*[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+laphroaig\b')
+    mac_pattern = re.compile(r'\b(?:[0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}\b')
+    
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if host_pattern.search(line) and mac_pattern.search(line):
+                print(line, end='')
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=46 FP=0 FN=0 returned=46 must=46
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=46 may_FP=0 may_FN=0 may=46
+  retries=1
+  input_tokens=40473 output_tokens=690
+  elapsed_seconds=153.25
+
+ID: dhcp_query_5 | type: where | query: List all log lines reporting IP assignments with lease durations over a day
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    log_file = sys.argv[1]
+    
+    # Regex to match dhclient "bound" messages that report a renewal duration.
+    # We look for "bound" followed eventually by "renewal in <duration> seconds".
+    pattern = re.compile(r"\bbound\b.*?\brenewal in (\d+)\s+seconds")
+    
+    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            m = pattern.search(line)
+            if m:
+                duration = int(m.group(1))
+                # 1 day = 86400 seconds.
+                if duration > 86400:
+                    sys.stdout.write(line)
+
+if __name__ == "__main__":
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2998 FP=0 FN=0 returned=2998 must=2998
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2998 may_FP=0 may_FN=0 may=2998
+  retries=0
+  input_tokens=20221 output_tokens=244
+  elapsed_seconds=53.61
+
+ID: dhcp_query_6 | type: where | query: List all log lines reporting DHCP destination IPs running on non standard ports
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_logs(file_path):
+    # Regex to capture the destination port in DHCP outbound messages
+    pattern = re.compile(r'\bDHCP[A-Z]+ on \S+ to \S+ port (\d+)\b')
+    
+    # RFC standard ports for DHCPv4 and DHCPv6
+    standard_ports = {'67', '68', '546', '547'}
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    port = match.group(1)
+                    if port not in standard_ports:
+                        print(line, end='')
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=1.0000 recall=0.8889 f1=0.9412 TP=8 FP=0 FN=1 returned=8 must=9
+  may_precision=1.0000 may_recall=0.8889 may_f1=0.9412 may_TP=8 may_FP=0 may_FN=1 may=9
+  retries=0
+  input_tokens=20221 output_tokens=252
+  elapsed_seconds=34.21
+
+ID: dhcp_query_7 | type: where | query: List all log lines reporting hosts using client version 3.0.1
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    file_path = sys.argv[1]
+    
+    # Pattern to match log lines reporting DHCP client version 3.0.1
+    # The regex accounts for optional 'V' or 'v' prefix and uses a word boundary 
+    # to ensure it doesn't match versions like 3.0.10.
+    pattern = re.compile(r'(?:Internet Systems Consortium DHCP Client |isc-dhclient-)[vV]?3\.0\.1\b')
+    
+    open_func = open
+    if file_path.endswith('.gz'):
+        import gzip
+        open_func = gzip.open
+
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5 FP=0 FN=0 returned=5 must=5
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5 may_FP=0 may_FN=0 may=5
+  retries=1
+  input_tokens=40479 output_tokens=604
+  elapsed_seconds=69.55
+
+ID: dhcp_query_8 | type: where | query: List all log lines reporting DHCPDISCOVER messages
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    filepath = sys.argv[1]
+    
+    # Pre-compile the regex to find DHCPDISCOVER with word boundaries
+    pattern = re.compile(r'\bDHCPDISCOVER\b')
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception as e:
+        print(f"Error reading file: {e}", file=sys.stderr)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=37738 FP=0 FN=0 returned=37738 must=37738
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=37738 may_FP=0 may_FN=0 may=37738
+  retries=1
+  input_tokens=40467 output_tokens=466
+  elapsed_seconds=37.7
+
+ID: dhcp_query_9 | type: where | query: List all log lines reporting XMT Renew messages
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    opener = gzip.open if file_path.endswith('.gz') else open
+    
+    pattern = re.compile(r'\bXMT:\s+Renew\b')
+    
+    try:
+        with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=0
+  input_tokens=20217 output_tokens=189
+  elapsed_seconds=19.61
+
+ID: dhcp_query_10 | type: where | query: Return logs reporting bad IP checksums
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    pattern = re.compile(r'\bbad IP checksums\b')
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=8 FP=0 FN=0 returned=8 must=8
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=8 may_FP=0 may_FN=0 may=8
+  retries=0
+  input_tokens=20215 output_tokens=188
+  elapsed_seconds=11.42
+
+ID: dhcp_select_1 | type: select | query: Return DHCP server IP addresses that are not broadcast addresses
+  requested output format=server_ip
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+
+    # Patterns for finding the server IP in various DHCP log entries
+    # Group 1: ACK/OFFER/NAK source IP
+    # Group 2: REQUEST/DISCOVER/RELEASE/DECLINE destination IP
+    # Group 3: IPv6 RCV message source IP
+    pattern = re.compile(
+        r'(?:DHCPACK|DHCPOFFER|DHCPNAK)\s+from\s+([a-fA-F0-9\.:]+)'
+        r'|'
+        r'(?:DHCPREQUEST|DHCPDISCOVER|DHCPRELEASE|DHCPDECLINE)\s+on\s+\S+\s+to\s+([a-fA-F0-9\.:]+)\s+port'
+        r'|'
+        r'RCV:\s+(?:Reply|Advertise)\s+message\s+on\s+\S+\s+from\s+([a-fA-F0-9\.:]+)'
+    )
+
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                for match in pattern.finditer(line):
+                    # Extract the first matching group that is not None
+                    ip = next((g for g in match.groups() if g is not None), None)
+                    if ip:
+                        # Remove any trailing dot which might be matched in IPv6 sentences
+                        ip = ip.rstrip('.')
+                        
+                        # Filter out the standard IPv4 broadcast address
+                        if ip != '255.255.255.255':
+                            print(ip)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9988 recall=0.9822 f1=0.9904 TP=828 FP=1 FN=15 returned=829 must=843
+  may_precision=0.9988 may_recall=0.9822 may_f1=0.9904 may_TP=828 may_FP=1 may_FN=15 may=843
+  retries=0
+  input_tokens=20388 output_tokens=467
+  elapsed_seconds=72.36
+
+ID: dhcp_select_2 | type: select | query: Find the MAC addresses reported for host laphroaig
+  requested output format=mac_address
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    # Regex to match a standard 6-byte MAC address
+    mac_re = re.compile(r'\b([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\b')
+    
+    seen = set()
+    
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            # Fast pre-check
+            if 'laphroaig' not in line:
+                continue
+            
+            parts = line.split()
+            try:
+                # Find the index of the log program identifier which starts with 'dhclient'
+                dhc_idx = next(i for i, p in enumerate(parts) if p.startswith('dhclient'))
+                # Ensure the preceding token is exactly our target host 'laphroaig'
+                if dhc_idx > 0 and parts[dhc_idx - 1] == 'laphroaig':
+                    # Extract and emit any MAC addresses found on this log line
+                    for mac in mac_re.findall(line):
+                        if mac not in seen:
+                            seen.add(mac)
+                            print(mac)
+            except StopIteration:
+                pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=20389 output_tokens=385
+  elapsed_seconds=67.56
+
+ID: dhcp_select_3 | type: select | query: Return all IPs that were assigned with lease durations over a day
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    filename = sys.argv[1]
+    
+    # Regex to extract the assigned IP and the renewal duration in seconds
+    # e.g., bound to 10.0.1.120 -- renewal in 19305 seconds.
+    pattern = re.compile(r'bound to\s+([0-9a-fA-F\.:]+)\s+--\s+renewal in\s+(\d+)')
+    
+    ips = set()
+    
+    open_func = gzip.open if filename.endswith('.gz') else open
+    
+    try:
+        with open_func(filename, 'rt', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    ip = match.group(1)
+                    duration = int(match.group(2))
+                    
+                    # "over a day" -> more than 86400 seconds
+                    if duration > 86400:
+                        ips.add(ip)
+    except Exception:
+        pass
+        
+    for ip in sorted(ips):
+        print(ip)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.9822 f1=0.9910 TP=331 FP=0 FN=6 returned=331 must=337
+  may_precision=1.0000 may_recall=0.9822 may_f1=0.9910 may_TP=331 may_FP=0 may_FN=6 may=337
+  retries=2
+  input_tokens=60726 output_tokens=1991
+  elapsed_seconds=290.73
+
+ID: dhcp_select_4 | type: select | query: Find the unique DHCP destination IPs used with non-standard ports
+  requested output format=destination_ip
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    unique_ips = set()
+    
+    # Regex to match 'to <IP> port <PORT>'
+    pattern = re.compile(r'\bto\s+([a-fA-F0-9.:]+)\s+port\s+(\d+)\b')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    ip, port = match.groups()
+                    # Standard DHCP ports are 67/68 (IPv4) and 546/547 (IPv6)
+                    if port not in {'67', '68', '546', '547'}:
+                        unique_ips.add(ip)
+    except Exception:
+        pass
+
+    # Output plain text values separated by single spaces
+    for ip in sorted(unique_ips):
+        print(ip)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.6667 f1=0.8000 TP=2 FP=0 FN=1 returned=2 must=3
+  may_precision=1.0000 may_recall=0.6667 may_f1=0.8000 may_TP=2 may_FP=0 may_FN=1 may=3
+  retries=0
+  input_tokens=20390 output_tokens=316
+  elapsed_seconds=26.63
+
+ID: dhcp_select_5 | type: select | query: Find the hosts using DHCP client version 3.0.1
+  requested output format=hostname
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    log_pattern = re.compile(r'(?:^|\s|<\d+>)([A-Z][a-z]{2}\s+\d+\s+\d\d:\d\d:\d\d)\s+(\S+)\s+dhclient(?:\[\d+\])?:\s+(.*)')
+    version_pattern = re.compile(r'(?:Internet Systems Consortium DHCP Client|isc-dhclient).*?(?<!\d)V?3\.0\.1(?!\d)')
+    
+    hosts = set()
+    with open(sys.argv[1], 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if '3.0.1' not in line:
+                continue
+            match = log_pattern.search(line)
+            if match:
+                host = match.group(2)
+                msg = match.group(3)
+                if version_pattern.search(msg):
+                    hosts.add(host)
+                    
+    for host in sorted(hosts):
+        print(host)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=20387 output_tokens=317
+  elapsed_seconds=43.21
+
+ID: dhcp_select_6 | type: select | query: List all hosts which sent a DHCPDISCOVER messages
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    log_file = sys.argv[1]
+    hosts = set()
+    
+    # Matches standard syslog timestamp and captures the host name before 'dhclient'
+    line_pattern = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+dhclient')
+    
+    open_func = gzip.open if log_file.endswith('.gz') else open
+    
+    try:
+        with open_func(log_file, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                # Fast check before regex matching
+                if 'DHCPDISCOVER' in line:
+                    match = line_pattern.search(line)
+                    if match:
+                        hosts.add(match.group(1))
+    except Exception as e:
+        sys.stderr.write(f"Error reading file: {e}\n")
+        sys.exit(1)
+        
+    for host in sorted(hosts):
+        print(host)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.9969 f1=0.9985 TP=645 FP=0 FN=2 returned=645 must=647
+  may_precision=1.0000 may_recall=0.9969 may_f1=0.9985 may_TP=645 may_FP=0 may_FN=2 may=647
+  retries=0
+  input_tokens=20218 output_tokens=330
+  elapsed_seconds=29.45
+
+ID: dhcp_select_7 | type: select | query: Find the unique hosts reporting an XMT Renew message
+  requested output format=hostname
+  requested output data type=string
+  command: import sys
+import re
+import gzip
+
+def process_file(filepath):
+    hostnames = set()
+    host_pattern = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+dhclient(?:\[\d+\])?\s*:')
+    renew_pattern = re.compile(r'\bXMT:?\s+Renew\b')
+    
+    open_fn = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with open_fn(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if renew_pattern.search(line):
+                    m = host_pattern.search(line)
+                    if m:
+                        hostnames.add(m.group(1))
+    except Exception:
+        pass
+                    
+    for host in sorted(hostnames):
+        print(host)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=20384 output_tokens=298
+  elapsed_seconds=45.05
+
+ID: simple_1 | type: where | query: Show all DHCPACK messages
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    filepath = sys.argv[1]
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    
+    with open_func(filepath, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if re.search(r'\bDHCPACK\b', line):
+                sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=35522 FP=0 FN=0 returned=35522 must=35522
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=35522 may_FP=0 may_FN=0 may=35522
+  retries=0
+  input_tokens=20213 output_tokens=165
+  elapsed_seconds=14.53
+
+ID: simple_2 | type: where | query: Find logs from interface eth0
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    opener = gzip.open if file_path.endswith('.gz') else open
+    pattern = re.compile(r'\beth0\b')
+    try:
+        with opener(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except BrokenPipeError:
+        sys.exit(0)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9973 recall=1.0000 f1=0.9987 TP=69491 FP=186 FN=0 returned=69677 must=69491
+  may_precision=0.9973 may_recall=1.0000 may_f1=0.9987 may_TP=69491 may_FP=186 may_FN=0 may=69491
+  retries=1
+  input_tokens=40461 output_tokens=408
+  elapsed_seconds=49.43
+
+ID: simple_3 | type: where | query: Show messages from host localhost
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    # Regular expression to match standard syslog format:
+    # Month Day Time Host dhclient
+    log_pattern = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(?P<host>\S+)\s+dhclient')
+    
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = log_pattern.search(line)
+                # Filter exactly for host 'localhost' avoiding partial matches
+                if match and match.group('host') == 'localhost':
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=96724 FP=0 FN=0 returned=96724 must=96724
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=96724 may_FP=0 may_FN=0 may=96724
+  retries=0
+  input_tokens=20213 output_tokens=253
+  elapsed_seconds=35.46
+
+ID: complex_1 | type: where | query: Find DHCPREQUEST messages on interface eth0 from host localhost with port 67
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def process_file(filepath):
+    syslog_regex = re.compile(
+        r'^\s*(?:<\d+>)?\s*(?:[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|[0-9T:.\-+]+)\s+(?P<host>\S+)\s+dhclient'
+    )
+    dhcp_regex = re.compile(r'\bDHCPREQUEST\s+on\s+eth0\s+to\s+\S+\s+port\s+67\b')
+
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m = syslog_regex.search(line)
+                if m and m.group('host') == 'localhost':
+                    if dhcp_regex.search(line):
+                        sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=11698 FP=0 FN=0 returned=11698 must=11698
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=11698 may_FP=0 may_FN=0 may=11698
+  retries=0
+  input_tokens=20224 output_tokens=325
+  elapsed_seconds=43.48
+
+ID: complex_2 | type: where | query: Show DHCPOFFER or DHCPACK messages from server 192.168.1.1
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Match either DHCPOFFER or DHCPACK coming from the specified server IP
+    pattern = re.compile(r'\b(?:DHCPOFFER|DHCPACK)\s+from\s+192\.168\.1\.1\b')
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5490 FP=0 FN=0 returned=5490 must=5490
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5490 may_FP=0 may_FN=0 may=5490
+  retries=0
+  input_tokens=20231 output_tokens=231
+  elapsed_seconds=19.29
+
+ID: complex_3 | type: where | query: Find all DHCP messages with transaction ID starting with 0x7
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_file(file_path):
+    pattern = re.compile(r'\bxid=0x7[0-9a-fA-F]*')
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if pattern.search(line):
+                sys.stdout.write(line)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6883 FP=0 FN=0 returned=6883 must=6883
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=6883 may_FP=0 may_FN=0 may=6883
+  retries=1
+  input_tokens=40475 output_tokens=438
+  elapsed_seconds=48.1
+
+ID: vague_1 | type: where | query: Show me DHCP errors
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def process_logs(file_path):
+    error_pattern = re.compile(
+        r"(?i)\b(?:"
+        r"fail(?:ed|s|ure)?|error|cannot|can't|no such|unreachable|is down|"
+        r"no dhcpoffers|unknown hardware|no buffer space|suspect|dhcpnak|"
+        r"dhcpdecline|permission denied|read-only|bad format|bad ip checksums?|"
+        r"bogus|invalid|corrupt|already in use|not permitted|malformed|"
+        r"out of range|expect(?:ed|ing)|unterminated|exceeds max|"
+        r"already running|unknown command|extra bytes|no broadcast|"
+        r"allocate memory|discarding packet|no working leases|notonlink|"
+        r"consult readme|no option named|sent -1|does not exist"
+        r")\b"
+    )
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if error_pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=0.8099 recall=1.0000 f1=0.8950 TP=22393 FP=5255 FN=1 returned=27648 must=22394
+  may_precision=0.9993 may_recall=0.9512 may_f1=0.9747 may_TP=27630 may_FP=18 may_FN=1416 may=29046
+  retries=0
+  input_tokens=20212 output_tokens=389
+  elapsed_seconds=102.65
+
+ID: vague_2 | type: where | query: Find network problems
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    pattern = re.compile(
+        r'(Network is down|Network is unreachable|No such device|No buffer space available|'
+        r'Failed to send|Cannot assign requested address|Address already in use|'
+        r'No broadcast interfaces found|Operation not permitted|receive_packet failed)',
+        re.IGNORECASE
+    )
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9989 recall=0.6064 f1=0.7546 TP=12157 FP=13 FN=7892 returned=12170 must=20049
+  may_precision=1.0000 may_recall=0.5214 may_f1=0.6854 may_TP=12170 may_FP=0 may_FN=11170 may=23340
+  retries=1
+  input_tokens=40455 output_tokens=760
+  elapsed_seconds=76.39
+
+ID: numerical_1 | type: where | query: Find entries with process ID greater than 5000
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    file_path = sys.argv[1]
+    
+    # Match standard syslog PIDs like 'dhclient[1234]:' 
+    # or specific patterns like 'dhclient(1234)'
+    pid_pattern = re.compile(r'\b[a-zA-Z0-9_-]+\[(\d+)\]:|\bdhclient\((\d+)\)')
+    
+    opener = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                for match in pid_pattern.finditer(line):
+                    pid_str = match.group(1) or match.group(2)
+                    if pid_str and int(pid_str) > 5000:
+                        sys.stdout.write(line)
+                        break
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9986 recall=1.0000 f1=0.9993 TP=104648 FP=144 FN=0 returned=104792 must=104648
+  may_precision=0.9986 may_recall=1.0000 may_f1=0.9993 may_TP=104648 may_FP=144 may_FN=0 may=104648
+  retries=0
+  input_tokens=20220 output_tokens=298
+  elapsed_seconds=42.47
+
+ID: numerical_2 | type: where | query: Show logs with retry interval less than 5
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    interval_re = re.compile(r'\binterval\s+(\d+)(ms)?\b')
+    
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            m = interval_re.search(line)
+            if m:
+                val = float(m.group(1))
+                if m.group(2) == 'ms':
+                    val /= 1000.0
+                
+                if val < 5:
+                    sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=0.9191 recall=1.0000 f1=0.9578 TP=5431 FP=478 FN=0 returned=5909 must=5431
+  may_precision=0.9191 may_recall=1.0000 may_f1=0.9578 may_TP=5431 may_FP=478 may_FN=0 may=5431
+  retries=0
+  input_tokens=20217 output_tokens=218
+  elapsed_seconds=25.44
+
+ID: time_1 | type: where | query: Show logs from June 18
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    pattern = re.compile(r'(?:^|<\d+>)\s*Jun\s+18\s+\d{2}:\d{2}:\d{2}')
+    try:
+        opener = gzip.open if file_path.endswith('.gz') else open
+        with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1495 FP=0 FN=0 returned=1495 must=1495
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1495 may_FP=0 may_FN=0 may=1495
+  retries=1
+  input_tokens=40463 output_tokens=433
+  elapsed_seconds=40.13
+
+ID: time_2 | type: where | query: Find messages from September
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    
+    file_path = sys.argv[1]
+    # Regex to match logs where the line begins with the 'Sep' month abbreviation,
+    # potentially prefixed by a syslog priority like <30>
+    pattern = re.compile(r'^(?:<\d+>)?Sep\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.match(line):
+                    sys.stdout.write(line)
+    except Exception as e:
+        sys.stderr.write(f"Error reading file: {e}\n")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=57756 FP=0 FN=0 returned=57756 must=57756
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=57756 may_FP=0 may_FN=0 may=57756
+  retries=0
+  input_tokens=20212 output_tokens=242
+  elapsed_seconds=20.69
+
+ID: select_1 | type: select | query: List all hosts that sent DHCPDISCOVER messages
+  command: import sys
+import re
+import gzip
+
+def process_logs(filename):
+    hosts = set()
+    pattern = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+dhclient(?:\[\d+\])?:?.*\bDHCPDISCOVER\b')
+    
+    opener = gzip.open if filename.endswith('.gz') else open
+    try:
+        with opener(filename, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'DHCPDISCOVER' in line:
+                    match = pattern.search(line)
+                    if match:
+                        hosts.add(match.group(1))
+    except Exception:
+        pass
+
+    for host in sorted(hosts):
+        print(host)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=1.0000 recall=0.9969 f1=0.9985 TP=645 FP=0 FN=2 returned=645 must=647
+  may_precision=1.0000 may_recall=0.9969 may_f1=0.9985 may_TP=645 may_FP=0 may_FN=2 may=647
+  retries=0
+  input_tokens=20217 output_tokens=277
+  elapsed_seconds=36.0
+
+ID: select_2 | type: select | query: Find the original log timestamps from lines reporting a network is down error, using the timestamp text at the beginning of each matching log line.
+  requested output format=log_timestamp
+  requested output data type=string
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+
+    # Regex to match the original timestamp at the beginning of the line
+    # and check for the "network is down" error phrase.
+    pattern = re.compile(r'^([A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2}).*?\bnetwork is down\b', re.IGNORECASE)
+
+    # Check if the file is gzipped
+    is_gzip = False
+    try:
+        with open(file_path, 'rb') as f:
+            if f.read(2) == b'\x1f\x8b':
+                is_gzip = True
+    except Exception:
+        pass
+
+    opener = gzip.open if is_gzip else open
+
+    try:
+        with opener(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    # The query explicitly requests the original timestamp text
+                    print(match.group(1))
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1212 FP=0 FN=0 returned=1212 must=1212
+  may_precision=1.0000 may_recall=0.1306 may_f1=0.2311 may_TP=1212 may_FP=0 may_FN=8067 may=9279
+  retries=0
+  input_tokens=20433 output_tokens=357
+  elapsed_seconds=28.19
+
+ID: select_3 | type: select | query: For each DHCP log line where both are available, return the interface and message type
+  requested output format=interface_name,message_type
+  requested output data type=string,string
+  command: import sys
+import gzip
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Matches IPv4 DHCP messages (e.g., DHCPREQUEST, DHCPDISCOVER)
+    # and IPv6 XMT (e.g., Solicit, Info-Request) and RCV messages (e.g., Reply message)
+    # The message type is captured in group 1, 2, or 3. The interface is in group 4.
+    pattern = re.compile(r'\b(?:(DHCP[A-Z]+)|XMT:\s+([\w\-]+)|RCV:\s+([\w\-]+(?:\s+message)?))\s+on\s+([A-Za-z0-9_:\.-]+)')
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                for match in pattern.finditer(line):
+                    msg_type = match.group(1) or match.group(2) or match.group(3)
+                    interface = match.group(4)
+                    print(f"{interface} {msg_type}")
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9551 recall=0.9696 f1=0.9623 TP=383 FP=18 FN=12 returned=401 must=395
+  may_precision=0.9551 may_recall=0.9696 may_f1=0.9623 may_TP=383 may_FP=18 may_FN=12 may=395
+  retries=0
+  input_tokens=20406 output_tokens=376
+  elapsed_seconds=109.96
+
+# Macro Averages (where/select queries)
+# precision=0.9675 recall=0.9715 f1=0.9602
+# may_precision=0.9734 may_recall=0.9402 may_f1=0.9365
+# retries_total=10 retries_avg=0.31
+# total_input_tokens=850750 total_output_tokens=14897
+# total_elapsed=2117.33s avg_elapsed=66.17s
+# Worst 5 queries by f1
+# 1. dhcp_query_3 | type: where | f1=0.4400 | query: Return all log lines for transaction ID 0x6520bf0e
+# 2. vague_2 | type: where | f1=0.7546 | query: Find network problems
+# 3. dhcp_select_4 | type: select | f1=0.8000 | query: Find the unique DHCP destination IPs used with non-standard ports
+# 4. vague_1 | type: where | f1=0.8950 | query: Show me DHCP errors
+# 5. dhcp_query_6 | type: where | f1=0.9412 | query: List all log lines reporting DHCP destination IPs running on non standard ports

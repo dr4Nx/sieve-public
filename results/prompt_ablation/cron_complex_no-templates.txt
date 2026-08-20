@@ -1,0 +1,463 @@
+# Evaluation report generated 20260429-130713
+# Source JSON: queries/cron_complex.json
+# Log file input: data/logs/cron
+# Log file resolved: data/logs/cron
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each distinct command executed by cron, count how many times it was executed and by how many distinct users.
+  requested output format=command,execution_count,distinct_user_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    log_file = sys.argv[1]
+    commands = defaultdict(lambda: {"count": 0, "users": set()})
+    
+    pattern = re.compile(r'(?i)crond?(?:\[\d+\])?:\s+(?:\(([^)]+)\)|(\S+))\s+CMD\s+(.*)')
+    
+    with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            match = pattern.search(line)
+            if match:
+                user = match.group(1) if match.group(1) is not None else match.group(2)
+                cmd_raw = match.group(3).strip()
+                
+                if cmd_raw.startswith('(') and cmd_raw.endswith(')'):
+                    cmd = cmd_raw[1:-1]
+                else:
+                    cmd = cmd_raw
+                    
+                commands[cmd]['count'] += 1
+                commands[cmd]['users'].add(user)
+                
+    for cmd, data in commands.items():
+        print(f"{cmd} {data['count']} {len(data['users'])}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=1
+  input_tokens=14201 output_tokens=782
+  elapsed_seconds=113.81
+
+ID: multiline_2 | type: select | query: For each hour of the day (0 through 23), count the total number of cron job command executions.
+  requested output format=hour,execution_count
+  requested output data type=integer,integer
+  command: import sys
+import re
+import gzip
+
+def process_file(filepath):
+    counts = {h: 0 for h in range(24)}
+    # Matches the first time-like pattern in the line to reliably extract the hour
+    time_pattern = re.compile(r'^.*?(\d{2}):\d{2}:\d{2}')
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with open_func(filepath, 'rt', errors='ignore') as f:
+            for line in f:
+                # Look for cron job command executions indicated by CMD
+                if ' CMD ' in line or ' CMD (' in line:
+                    m = time_pattern.search(line)
+                    if m:
+                        counts[int(m.group(1))] += 1
+    except Exception:
+        pass
+
+    # Emit results for each hour exactly as requested
+    for h in range(24):
+        print(f"{h} {counts[h]}")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=24 FP=0 FN=0 returned=24 must=24
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=24 may_FP=0 may_FN=0 may=24
+  retries=0
+  input_tokens=7069 output_tokens=300
+  elapsed_seconds=41.13
+
+ID: multiline_3 | type: select | query: For each date, count the number of cron session opens, session closes, and command executions.
+  requested output format=date,session_opens,session_closes,cmd_executions
+  requested output data type=string,integer,integer,integer
+  command: import sys
+import re
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    # Match either ISO 8601 date (YYYY-MM-DD) or syslog date (Month DD)
+    date_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2})')
+    counts = defaultdict(lambda: [0, 0, 0])
+    
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m = date_pattern.search(line)
+                if m:
+                    date_str = m.group(1)
+                    
+                    # Check for events
+                    if "session opened" in line:
+                        counts[date_str][0] += 1
+                    elif "session closed" in line:
+                        counts[date_str][1] += 1
+                    elif " CMD " in line:
+                        counts[date_str][2] += 1
+    except FileNotFoundError:
+        pass
+
+    for date_str in sorted(counts.keys()):
+        print(f"{date_str} {counts[date_str][0]} {counts[date_str][1]} {counts[date_str][2]}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.9630 recall=1.0000 f1=0.9811 TP=26 FP=1 FN=0 returned=27 must=26
+  may_precision=0.9630 may_recall=1.0000 may_f1=0.9811 may_TP=26 may_FP=1 may_FN=0 may=26
+  retries=0
+  input_tokens=7089 output_tokens=402
+  elapsed_seconds=31.77
+
+ID: multiline_4 | type: select | query: For each cron command, find the maximum elapsed time in seconds between any two consecutive executions of that same command. Floor the result to the nearest whole second (e.g. 900.99s becomes 900). Return the command and the maximum gap. This identifies missed or delayed scheduled executions.
+  requested output format=command,max_gap_seconds
+  requested output data type=string,integer
+  command: import sys
+import re
+import math
+import gzip
+from datetime import datetime
+
+def parse_timestamp(ts_str):
+    try:
+        if hasattr(datetime, 'fromisoformat'):
+            try:
+                return datetime.fromisoformat(ts_str.replace('Z', '+00:00')).timestamp()
+            except ValueError:
+                pass
+        
+        if 'T' in ts_str:
+            if ts_str.endswith('Z'):
+                ts_str_clean = ts_str[:-1] + '+0000'
+            elif len(ts_str) >= 3 and ts_str[-3] == ':':
+                ts_str_clean = ts_str[:-3] + ts_str[-2:]
+            else:
+                ts_str_clean = ts_str
+            
+            if '.' in ts_str_clean:
+                try:
+                    return datetime.strptime(ts_str_clean, '%Y-%m-%dT%H:%M:%S.%f%z').timestamp()
+                except ValueError:
+                    return datetime.strptime(ts_str_clean, '%Y-%m-%dT%H:%M:%S.%f').timestamp()
+            else:
+                try:
+                    return datetime.strptime(ts_str_clean, '%Y-%m-%dT%H:%M:%S%z').timestamp()
+                except ValueError:
+                    return datetime.strptime(ts_str_clean, '%Y-%m-%dT%H:%M:%S').timestamp()
+        else:
+            ts_str_clean = " ".join(ts_str.split())
+            return datetime.strptime(ts_str_clean + " 2000", '%b %d %H:%M:%S %Y').timestamp()
+    except Exception:
+        return None
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    filename = sys.argv[1]
+    
+    cmd_timestamps = {}
+    pattern = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T\S+).*?\sCMD\s*\(\s*(.*?)\s*\)\s*$')
+    
+    open_func = gzip.open if filename.endswith('.gz') else open
+    
+    try:
+        with open_func(filename, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                match = pattern.match(line)
+                if match:
+                    ts_str = match.group(1)
+                    command = match.group(2).strip()
+                    ts = parse_timestamp(ts_str)
+                    if ts is not None and command:
+                        if command not in cmd_timestamps:
+                            cmd_timestamps[command] = []
+                        cmd_timestamps[command].append(ts)
+    except IOError:
+        pass
+        
+    for cmd, timestamps in cmd_timestamps.items():
+        if len(timestamps) > 1:
+            timestamps.sort()
+            max_gap = 0
+            for i in range(1, len(timestamps)):
+                gap = timestamps[i] - timestamps[i-1]
+                if gap > max_gap:
+                    max_gap = gap
+            print(f"{cmd} {math.floor(max_gap)}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=1
+  input_tokens=14263 output_tokens=1855
+  elapsed_seconds=194.82
+
+ID: multiline_5 | type: select | query: Find cron sessions (by host and process ID) where a session was opened but no command was executed in the same process.
+  requested output format=host,process_id
+  requested output data type=string,integer
+  command: import sys
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    filename = sys.argv[1]
+    open_func = gzip.open if filename.endswith('.gz') else open
+    
+    session_opened = {}
+    cmd_executed = set()
+    
+    # Matches: host process[pid]: msg
+    pattern = re.compile(r'(?:^|\s)([A-Za-z0-9_.-]+)\s+(?i:crond?)\[(\d+)\]:\s+(.*)')
+    
+    try:
+        with open_func(filename, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    host = match.group(1)
+                    pid = int(match.group(2))
+                    msg = match.group(3)
+                    
+                    key = (host, pid)
+                    
+                    if 'session opened' in msg:
+                        if key not in session_opened:
+                            session_opened[key] = True
+                    if 'CMD' in msg:
+                        cmd_executed.add(key)
+                        
+        for key in session_opened:
+            if key not in cmd_executed:
+                print(f"{key[0]} {key[1]}")
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9998 recall=1.0000 f1=0.9999 TP=4380 FP=1 FN=0 returned=4381 must=4380
+  may_precision=0.9998 may_recall=1.0000 may_f1=0.9999 may_TP=4380 may_FP=1 may_FN=0 may=4380
+  retries=0
+  input_tokens=7071 output_tokens=376
+  elapsed_seconds=42.21
+
+ID: multiline_6 | type: select | query: For each distinct command executed by cron, return the earliest and latest execution timestamp text.
+  requested output format=command,earliest_timestamp,latest_timestamp
+  requested output data type=string,string,string
+  command: import sys
+import re
+import gzip
+
+MONTHS = {
+    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+}
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    ts_pattern = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T\S+)')
+    cmd_pattern = re.compile(r'\s+(?:\S+\s+)?(?i:cron)(?:\[\d+\])?:(?:\s+\([^)]+\))?\s+CMD\s+\((.*)\)\s*$')
+    
+    commands = {}
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    def get_sort_key(ts_str):
+        if 'T' in ts_str:
+            m = re.match(r'^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?', ts_str)
+            if m:
+                date_part = m.group(1).replace('-', '')
+                time_part = m.group(2).replace(':', '')
+                frac_part = m.group(3) or "000000"
+                return date_part + time_part + frac_part[:6].ljust(6, '0')
+            return ts_str
+        else:
+            try:
+                parts = ts_str.split()
+                if len(parts) >= 3:
+                    month = MONTHS.get(parts[0][:3].capitalize(), 1)
+                    day = int(parts[1])
+                    return f"2000{month:02d}{day:02d}{parts[2].replace(':', '')}000000"
+            except Exception:
+                pass
+            return ts_str
+
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                ts_m = ts_pattern.match(line)
+                if not ts_m:
+                    continue
+                ts_str = ts_m.group(1)
+                
+                cmd_m = cmd_pattern.match(line[ts_m.end():])
+                if cmd_m:
+                    cmd = cmd_m.group(1).strip()
+                    key = get_sort_key(ts_str)
+                    
+                    if cmd not in commands:
+                        commands[cmd] = {
+                            'earliest_ts': ts_str,
+                            'latest_ts': ts_str,
+                            'min_key': key,
+                            'max_key': key
+                        }
+                    else:
+                        if key < commands[cmd]['min_key']:
+                            commands[cmd]['min_key'] = key
+                            commands[cmd]['earliest_ts'] = ts_str
+                        if key > commands[cmd]['max_key']:
+                            commands[cmd]['max_key'] = key
+                            commands[cmd]['latest_ts'] = ts_str
+    except Exception:
+        pass
+
+    for cmd, info in commands.items():
+        print(f"{cmd} {info['earliest_ts']} {info['latest_ts']}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=0
+  input_tokens=7103 output_tokens=956
+  elapsed_seconds=140.93
+
+ID: multiline_7 | type: select | query: For each date and 15-minute time interval, count the number of cron command executions. The interval is represented as minutes since midnight (0, 15, 30, 45, 60, ...). Return only intervals that had at least one execution.
+  requested output format=date,interval_minutes,execution_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def process_logs(filepath):
+    execution_counts = defaultdict(int)
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            # Identify command executions by matching the word CMD
+            if not re.search(r'\bCMD\b', line):
+                continue
+                
+            # Match ISO 8601-like timestamps
+            m_iso = re.match(r'^(\d{4}-\d{2}-\d{2})[T\s](\d{2}):(\d{2}):\d{2}', line)
+            # Match standard syslog timestamps
+            m_syslog = re.match(r'^([A-Z][a-z]{2}\s+\d+)\s+(\d{2}):(\d{2}):\d{2}', line)
+            
+            date_val = None
+            hour = None
+            minute = None
+            
+            if m_iso:
+                date_val = m_iso.group(1)
+                hour = int(m_iso.group(2))
+                minute = int(m_iso.group(3))
+            elif m_syslog:
+                date_val = re.sub(r'\s+', ' ', m_syslog.group(1))
+                hour = int(m_syslog.group(2))
+                minute = int(m_syslog.group(3))
+                
+            if date_val is not None and hour is not None and minute is not None:
+                interval_minutes = hour * 60 + (minute // 15) * 15
+                execution_counts[(date_val, interval_minutes)] += 1
+                
+    for (date_val, interval_minutes) in sorted(execution_counts.keys()):
+        print(f"{date_val} {interval_minutes} {execution_counts[(date_val, interval_minutes)]}")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2476 FP=0 FN=0 returned=2476 must=2476
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2476 may_FP=0 may_FN=0 may=2476
+  retries=1
+  input_tokens=14267 output_tokens=1201
+  elapsed_seconds=127.58
+
+ID: multiline_8 | type: select | query: For each host and date, count the number of cron command executions and session opens.
+  requested output format=host,date,cmd_executions,session_opens
+  requested output data type=string,string,integer,integer
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+
+    counts = {}
+
+    with open(sys.argv[1], 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+
+            ts = parts[0]
+            host = parts[1]
+
+            date_match = re.match(r'^(\d{4}-\d{2}-\d{2})', ts)
+            if not date_match:
+                continue
+            date = date_match.group(1)
+
+            key = (host, date)
+            if key not in counts:
+                counts[key] = [0, 0]
+
+            if ' CMD (' in line:
+                counts[key][0] += 1
+            elif 'session opened' in line:
+                counts[key][1] += 1
+
+    for (host, date), (cmd, sess) in counts.items():
+        print(f"{host} {date} {cmd} {sess}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=26 FP=0 FN=0 returned=26 must=26
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=26 may_FP=0 may_FN=0 may=26
+  retries=0
+  input_tokens=7083 output_tokens=320
+  elapsed_seconds=36.99
+
+# Macro Averages (where/select queries)
+# precision=0.9953 recall=1.0000 f1=0.9976
+# may_precision=0.9953 may_recall=1.0000 may_f1=0.9976
+# retries_total=3 retries_avg=0.38
+# total_input_tokens=78146 total_output_tokens=6192
+# total_elapsed=729.24s avg_elapsed=91.16s
+# Worst 5 queries by f1
+# 1. multiline_3 | type: select | f1=0.9811 | query: For each date, count the number of cron session opens, session closes, and command executions.
+# 2. multiline_5 | type: select | f1=0.9999 | query: Find cron sessions (by host and process ID) where a session was opened but no command was executed in the same process.
+# 3. multiline_1 | type: select | f1=1.0000 | query: For each distinct command executed by cron, count how many times it was executed and by how many distinct users.
+# 4. multiline_2 | type: select | f1=1.0000 | query: For each hour of the day (0 through 23), count the total number of cron job command executions.
+# 5. multiline_4 | type: select | f1=1.0000 | query: For each cron command, find the maximum elapsed time in seconds between any two consecutive executions of that same command. Floor the result to the nearest whole second (e.g. 900.99s becomes 900). Return the command and the maximum gap. This identifies missed or delayed scheduled executions.

@@ -1,0 +1,39 @@
+# Human baseline report for puppet_complex
+# Baseline scripts: human_baselines/puppet_complex
+# Log file: data/logs/puppet
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each host, count Puppet runs that begin applying a configuration version, count how many of those runs later finish, and return the completion rate.
+  script: human_baselines/puppet_complex/multiline_1.py
+  precision=0.0625 recall=0.1200 f1=0.0822 TP=3 FP=45 FN=22 returned=48 must=25
+
+ID: multiline_2 | type: select | query: For each host, average the runtime reported for finished catalog runs and return the host with the average runtime in seconds.
+  script: human_baselines/puppet_complex/multiline_2.py
+  precision=0.1915 recall=0.1915 f1=0.1915 TP=9 FP=38 FN=38 returned=47 must=47
+
+ID: multiline_3 | type: select | query: Find Puppet agent processes where a node-definition fetch failure is later followed by use of a cached catalog. Return the host, process id, and the original syslog timestamp text from those two events.
+  script: human_baselines/puppet_complex/multiline_3.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=42 FN=43 returned=42 must=43
+
+ID: multiline_4 | type: select | query: For each host that saw report-send failures or remote catalog retrieval failures, count both and return those two totals.
+  script: human_baselines/puppet_complex/multiline_4.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=19 FP=0 FN=0 returned=19 must=19
+
+ID: multiline_5 | type: select | query: For each Puppet module name appearing after '/Stage[main]/' in skipped resource identifiers, count how many resources were skipped because of failed dependencies.
+  script: human_baselines/puppet_complex/multiline_5.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=151 FP=0 FN=0 returned=151 must=151
+
+ID: multiline_6 | type: select | query: For each host, group Puppet failure messages into these error families when they apply: certificate_verify_failed, getaddrinfo, network_unreachable, command_not_found, timeout, error_downloading_packages, and no_child_processes. Return the host, the error family name, and the count.
+  script: human_baselines/puppet_complex/multiline_6.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=19 FP=0 FN=0 returned=19 must=19
+
+ID: multiline_7 | type: select | query: For each host and Puppet agent process that logged refresh activity, count how many refreshes were scheduled and how many refreshes were triggered.
+  script: human_baselines/puppet_complex/multiline_7.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=204 FP=0 FN=0 returned=204 must=204
+
+ID: multiline_8 | type: select | query: Find Puppet agent processes where a remote catalog retrieval failure is followed by use of a cached catalog and then a report-send failure. Return the host, process id, and the original syslog timestamp text from those three events.
+  script: human_baselines/puppet_complex/multiline_8.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=152 FN=28 returned=152 must=28
+
+# Macro Averages
+# precision=0.5317 recall=0.5389 f1=0.5342

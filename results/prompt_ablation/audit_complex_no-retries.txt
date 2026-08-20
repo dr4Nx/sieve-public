@@ -1,0 +1,385 @@
+# Evaluation report generated 20260429-135358
+# Source JSON: queries/audit_complex.json
+# Log file input: data/logs/audit
+# Log file resolved: data/logs/audit
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 0
+# Timeout: 600
+# Templates: templates/audit.json
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each host, count SELinux AVC denial events and the number of distinct denied permissions.
+  requested output format=host,avc_denial_count,distinct_denied_permission_count
+  requested output data type=string,integer,integer
+  ERROR: __EVAL_ERROR__: script exited 4: [ERROR] Refusing to execute the generated command due to safety checks.
+  precision=0.0 recall=0.0 f1=0.0 TP=0 FP=0 FN=347
+  may_precision=0.0 may_recall=0.0 may_f1=0.0 may_TP=0 may_FP=0 may_FN=347
+  retries=unknown
+
+ID: multiline_2 | type: select | query: For each host, count SELinux policy load events and enforcing mode changes.
+  requested output format=host,policy_load_count,enforcing_change_count
+  requested output data type=string,integer,integer
+  ERROR: __EVAL_ERROR__: script exited 4: [ERROR] Refusing to execute the generated command due to safety checks.
+  precision=0.0 recall=0.0 f1=0.0 TP=0 FP=0 FN=891
+  may_precision=0.0 may_recall=0.0 may_f1=0.0 may_TP=0 may_FP=0 may_FN=891
+  retries=unknown
+
+ID: multiline_3 | type: select | query: Identify hosts and SELinux booleans where the same boolean was changed from enabled to disabled and later changed back to enabled. Return host, boolean_name, disable_event_timestamp, and enable_event_timestamp.
+  requested output format=host,boolean_name,disable_event_timestamp,enable_event_timestamp
+  requested output data type=string,string,float,float
+  command: import sys
+import re
+import gzip
+
+def process_file(filepath):
+    bool_re = re.compile(r'\bbool=(\S+)\s+val=([01])\s+old_val=([01])')
+    ts_re = re.compile(r'audit\(([0-9]+(?:\.[0-9]+)?):\d+\)')
+    syslog_re = re.compile(r'^(?:[a-zA-Z0-9_/.-]+:)?(?:\d+\s+)?(?:[A-Za-z.]+\s+\d+\s+\d{2}:\d{2}:\d{2}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.\+-]+)\s+([^\s:]+)\s+')
+    node_re = re.compile(r'\bnode=([^\s:]+)')
+
+    disabled_booleans = {}
+
+    try:
+        open_func = gzip.open if filepath.endswith('.gz') else open
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                bm = bool_re.search(line)
+                if not bm:
+                    continue
+
+                tm = ts_re.search(line)
+                if not tm:
+                    continue
+                
+                boolean = bm.group(1)
+                val = bm.group(2)
+                old_val = bm.group(3)
+                timestamp = float(tm.group(1))
+
+                # get host
+                nm = node_re.search(line)
+                if nm:
+                    host = nm.group(1)
+                else:
+                    sm = syslog_re.search(line)
+                    if sm:
+                        host = sm.group(1)
+                    else:
+                        host = 'unknown'
+
+                if old_val == '1' and val == '0':
+                    disabled_booleans[(host, boolean)] = timestamp
+                elif old_val == '0' and val == '1':
+                    if (host, boolean) in disabled_booleans:
+                        disable_ts = disabled_booleans.pop((host, boolean))
+                        print(f"{host} {boolean} {disable_ts} {timestamp}")
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=14 FP=0 FN=0 returned=14 must=14
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=14 may_FP=0 may_FN=0 may=14
+  retries=0
+  input_tokens=127449 output_tokens=626
+  elapsed_seconds=81.68
+
+ID: multiline_4 | type: select | query: For each host and PAM action, count total PAM events and how many of those events ended in failure.
+  requested output format=host,pam_action,pam_event_count,failed_pam_event_count
+  requested output data type=string,string,integer,integer
+  ERROR: __EVAL_ERROR__: script exited 4: [ERROR] Refusing to execute the generated command due to safety checks.
+  precision=0.0 recall=0.0 f1=0.0 TP=0 FP=0 FN=93
+  may_precision=0.0 may_recall=0.0 may_f1=0.0 may_TP=0 may_FP=0 may_FN=93
+  retries=unknown
+
+ID: multiline_5 | type: select | query: For each source address, count failed SSH authentication attempts recorded by sshd.
+  requested output format=source_address,failed_ssh_attempt_count
+  requested output data type=string,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    counts = defaultdict(int)
+    
+    type_re = re.compile(r'\btype=(?:USER_LOGIN|1112|USER_AUTH|1100|USER_ERR|1104)\b')
+    sshd_re = re.compile(r'\b(?:exe|comm)=(?:\x22(?:[^\x22]*/)?sshd\x22|\x27(?:[^\x27]*/)?sshd\x27|(?:[^\s,\x27\x22\)\]]*/)?sshd)\b')
+    addr_re = re.compile(r'\baddr=(?:\x22([^\x22]+)\x22|\x27([^\x27]+)\x27|([^\s,\x27\x22\)\]]+))')
+    res_re = re.compile(r'\bres=(?:\x22failed\x22|\x27failed\x27|failed)\b')
+    
+    filepath = sys.argv[1]
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if res_re.search(line) and sshd_re.search(line) and type_re.search(line):
+                    m = addr_re.search(line)
+                    if m:
+                        addr = m.group(1) or m.group(2) or m.group(3)
+                        if addr:
+                            counts[addr] += 1
+    except Exception:
+        pass
+        
+    for addr, count in counts.items():
+        print(f"{addr} {count}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=23 returned=0 must=23
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=0 may_FN=23 may=23
+  retries=0
+  input_tokens=127337 output_tokens=514
+  elapsed_seconds=185.36
+
+ID: multiline_6 | type: select | query: For each systemd service unit, count unit start events and unit stop events.
+  requested output format=service_unit,unit_start_count,unit_stop_count
+  requested output data type=string,integer,integer
+  command: import sys
+import collections
+import re
+import gzip
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    filepath = sys.argv[1]
+    
+    stats = collections.defaultdict(lambda: [0, 0])
+    
+    # 1130 / SERVICE_START = unit start
+    # 1131 / SERVICE_STOP = unit stop
+    type_re = re.compile(r'\btype=(1130|1131|SERVICE_START|SERVICE_STOP)\b', re.IGNORECASE)
+    # Matches unit="val", unit='val', or unit=val up to whitespace/quote
+    unit_re = re.compile(r'\bunit=(?:"([^"]+)"|\'([^\']+)\'|([^\s\'">]+))')
+    
+    open_func = gzip.open if filepath.endswith('.gz') else open
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                t_m = type_re.search(line)
+                if not t_m:
+                    continue
+                    
+                u_m = unit_re.search(line)
+                if not u_m:
+                    continue
+                    
+                event_type = t_m.group(1).upper()
+                unit = u_m.group(1) or u_m.group(2) or u_m.group(3)
+                
+                if event_type in ('1130', 'SERVICE_START'):
+                    stats[unit][0] += 1
+                elif event_type in ('1131', 'SERVICE_STOP'):
+                    stats[unit][1] += 1
+    except Exception:
+        pass
+        
+    for unit in sorted(stats.keys()):
+        print(f"{unit} {stats[unit][0]} {stats[unit][1]}")
+
+if __name__ == '__main__':
+    main()
+  precision=0.8166 recall=0.8539 f1=0.8348 TP=187 FP=42 FN=32 returned=229 must=219
+  may_precision=0.8166 may_recall=0.8539 may_f1=0.8348 may_TP=187 may_FP=42 may_FN=32 may=219
+  retries=0
+  input_tokens=127350 output_tokens=519
+  elapsed_seconds=48.61
+
+ID: multiline_7 | type: select | query: For each host, count audit subsystem initialization events and audit daemon process ID set events.
+  requested output format=host,audit_initialized_count,audit_pid_set_count
+  requested output data type=string,integer,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def extract_host(line):
+    # Extract explicit node=
+    node_match = re.search(r'\bnode=([^\s]+)', line)
+    if node_match:
+        return node_match.group(1)
+        
+    # Fallback to standard syslog prefix formats
+    # Matches: optional file path prefix, timestamp, then hostname token
+    ts_pattern = r'^(?:[a-zA-Z0-9_\-\.\/]+:)?\s*(?:(?:\d+\s+)?[^\s\d:]+\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T[^\s]+|\d{1,2}:\d{2}:\d{2}(?:\s+[A-Za-z]{2})?)\s+([^\s]+)'
+    ts_match = re.search(ts_pattern, line)
+    if ts_match:
+        host = ts_match.group(1)
+        if host.endswith(':'):
+            host = host[:-1]
+        
+        # Filter out tokens that belong to typical daemon names or tags instead of hosts
+        daemons = {"kernel", "audispd", "setroubleshoot", "audit_log", "klogd", "audit", "type", "msg", "type=AVC"}
+        if host.startswith('[') or host.startswith('kernel') or host.startswith('audispd') or host in daemons:
+            return None
+        return host
+    return None
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    file_path = sys.argv[1]
+    
+    counts = defaultdict(lambda: {"init": 0, "pid_set": 0})
+    
+    # audit subsystem initialization events
+    init_re1 = re.compile(r'\btype=2000\b')
+    init_re2 = re.compile(r'\binitialized\b')
+    
+    # audit daemon process ID set events
+    pid_re = re.compile(r'\baudit_pid=\d+')
+    
+    open_fn = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_fn(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                is_init = bool(init_re1.search(line) and init_re2.search(line))
+                is_pid = bool(pid_re.search(line))
+                
+                if not (is_init or is_pid):
+                    continue
+                    
+                host = extract_host(line)
+                if host:
+                    if is_init:
+                        counts[host]["init"] += 1
+                    if is_pid:
+                        counts[host]["pid_set"] += 1
+                        
+        for host, c in counts.items():
+            print(f"{host} {c['init']} {c['pid_set']}")
+            
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9948 recall=0.9983 f1=0.9966 TP=1157 FP=6 FN=2 returned=1163 must=1159
+  may_precision=0.9948 may_recall=0.9983 may_f1=0.9966 may_TP=1157 may_FP=6 may_FN=2 may=1159
+  retries=0
+  input_tokens=127351 output_tokens=818
+  elapsed_seconds=100.77
+
+ID: multiline_8 | type: select | query: For each executable path and signal number, count crash signal events.
+  requested output format=executable_path,signal_number,crash_event_count
+  requested output data type=string,string,integer
+  command: import sys
+import re
+import gzip
+from collections import defaultdict
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    transactions = defaultdict(list)
+    crash_counts = defaultdict(int)
+    
+    tx_pattern = re.compile(r'audit\(([^)]+)\)')
+    type_pattern = re.compile(r'\btype=([A-Z0-9_]+)')
+    sig_pattern = re.compile(r'\bsig=(\d+)')
+    exe_pattern = re.compile(r'\bexe=(?:"([^"]+)"|([^\s]+))')
+    
+    def extract_host(line):
+        node_match = re.search(r'\bnode=([^\s]+)', line)
+        if node_match:
+            return node_match.group(1)
+        syslog_match = re.search(r'(?:^|^[^:]+:\s*)[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+([^\s:]+)', line)
+        if syslog_match:
+            return syslog_match.group(1)
+        iso_match = re.search(r'(?:^|^[^:]+:\s*)\d{4}-\d{2}-\d{2}T\S+\s+([^\s:]+)', line)
+        if iso_match:
+            return iso_match.group(1)
+        return None
+
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                tx_match = tx_pattern.search(line)
+                tx_id = tx_match.group(1) if tx_match else None
+                
+                type_match = type_pattern.search(line)
+                event_type = type_match.group(1) if type_match else None
+                
+                sig_match = sig_pattern.search(line)
+                sig = sig_match.group(1) if sig_match else None
+                
+                exe_match = exe_pattern.search(line)
+                exe = None
+                if exe_match:
+                    exe = exe_match.group(1) if exe_match.group(1) is not None else exe_match.group(2)
+                
+                host = extract_host(line)
+                is_crash = (event_type in ('1701', 'ANOM_ABEND'))
+                
+                if tx_id:
+                    transactions[tx_id].append({
+                        'host': host,
+                        'is_crash': is_crash,
+                        'sig': sig,
+                        'exe': exe
+                    })
+                else:
+                    if is_crash and sig and exe:
+                        crash_counts[(exe, sig)] += 1
+    except Exception:
+        pass
+
+    for tx_id, events in transactions.items():
+        hosts = set(e['host'] for e in events if e['host'])
+        if not hosts:
+            hosts = {None}
+            
+        for h in hosts:
+            h_is_crash = False
+            h_sig = None
+            h_exe = None
+            for e in events:
+                if e['host'] in (h, None):
+                    if e['is_crash']:
+                        h_is_crash = True
+                    if e['sig']:
+                        h_sig = e['sig']
+                    if e['exe']:
+                        h_exe = e['exe']
+            
+            if h_is_crash and h_sig and h_exe:
+                crash_counts[(h_exe, h_sig)] += 1
+
+    for (exe, sig), count in sorted(crash_counts.items()):
+        print(f"{exe} {sig} {count}")
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=8 FP=0 FN=0 returned=8 must=8
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=8 may_FP=0 may_FN=0 may=8
+  retries=0
+  input_tokens=127343 output_tokens=1028
+  elapsed_seconds=153.53
+
+# Macro Averages (where/select queries)
+# precision=0.4764 recall=0.4815 f1=0.4789
+# may_precision=0.4764 may_recall=0.4815 may_f1=0.4789
+# retries_total=0 retries_avg=0.00
+# total_input_tokens=636830 total_output_tokens=3505
+# total_elapsed=569.95s avg_elapsed=113.99s
+# Worst 5 queries by f1
+# 1. multiline_1 | type: select | f1=0.0000 | error: __EVAL_ERROR__: script exited 4: [ERROR] Refusing to execute the generated command due to safety checks.
+# 2. multiline_2 | type: select | f1=0.0000 | error: __EVAL_ERROR__: script exited 4: [ERROR] Refusing to execute the generated command due to safety checks.
+# 3. multiline_4 | type: select | f1=0.0000 | error: __EVAL_ERROR__: script exited 4: [ERROR] Refusing to execute the generated command due to safety checks.
+# 4. multiline_5 | type: select | f1=0.0000 | query: For each source address, count failed SSH authentication attempts recorded by sshd.
+# 5. multiline_6 | type: select | f1=0.8348 | query: For each systemd service unit, count unit start events and unit stop events.

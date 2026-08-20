@@ -1,0 +1,185 @@
+# Evaluation report generated 20260429-131855
+# Source JSON: queries/puppet_simple.json
+# Log file input: data/logs/puppet
+# Log file resolved: data/logs/puppet
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/puppet.json
+# Queries evaluated: 12
+
+ID: puppet_query_1 | type: where | query: Find log lines indicating Puppet runs were disabled by an administrative action.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines indicating puppet was administratively disabled or is being disabled
+tolower($0) ~ /administratively disabled|disabling puppet/ {
+    print $0
+}' data/logs/puppet
+  precision=0.9802 recall=1.0000 f1=0.9900 TP=198 FP=4 FN=0 returned=202 must=198
+  may_precision=0.9802 may_recall=1.0000 may_f1=0.9900 may_TP=198 may_FP=4 may_FN=0 may=198
+  retries=0
+  input_tokens=46075 output_tokens=71
+  elapsed_seconds=14.86
+
+ID: puppet_query_2 | type: where | query: Find log lines indicating Puppet execution was re-enabled after being disabled.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Search for the exact phrase indicating Puppet was re-enabled
+/[Ee]nabling [Pp]uppet/ { print $0 }
+' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=66 FP=0 FN=0 returned=66 must=66
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=66 may_FP=0 may_FN=0 may=66
+  retries=0
+  input_tokens=46076 output_tokens=59
+  elapsed_seconds=13.38
+
+ID: puppet_query_3 | type: where | query: Find log lines where Puppet says it could not fetch the node definition it needed.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Unable to fetch my node definition/' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=59 FP=0 FN=0 returned=59 must=59
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=59 may_FP=0 may_FN=0 may=59
+  retries=0
+  input_tokens=46078 output_tokens=33
+  elapsed_seconds=9.61
+
+ID: puppet_query_4 | type: where | query: Find log lines showing the agent could not retrieve its catalog from a remote source.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines where the puppet agent explicitly fails to retrieve the catalog from a remote server
+/Could not retrieve catalog from remote server/ {
+    print $0
+}
+' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=101 FP=0 FN=0 returned=101 must=101
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=101 may_FP=0 may_FN=0 may=101
+  retries=0
+  input_tokens=46078 output_tokens=66
+  elapsed_seconds=15.92
+
+ID: puppet_query_5 | type: where | query: Find log lines showing the agent fell back to a cached catalog after a remote problem.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Find log lines indicating the puppet agent fell back to using a cached catalog
+/Using cached catalog/ {
+    print $0
+}
+' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=66 FP=0 FN=0 returned=66 must=66
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=66 may_FP=0 may_FN=0 may=66
+  retries=0
+  input_tokens=46079 output_tokens=70
+  elapsed_seconds=12.98
+
+ID: puppet_query_6 | type: where | query: Find log lines showing Puppet could not deliver its report back to a remote service.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Could not send report:/' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=33 FP=0 FN=0 returned=33 must=33
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=33 may_FP=0 may_FN=0 may=33
+  retries=0
+  input_tokens=46078 output_tokens=32
+  elapsed_seconds=11.74
+
+ID: puppet_query_7 | type: where | query: Find log lines showing resources were skipped because a dependency chain had already failed.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Skipping because of failed dependencies/' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=38356 FP=0 FN=0 returned=38356 must=38356
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=38356 may_FP=0 may_FN=0 may=38356
+  retries=0
+  input_tokens=46077 output_tokens=33
+  elapsed_seconds=14.05
+
+ID: puppet_query_8 | type: where | query: Find log lines where Puppet reports that a needed command could not be found.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match shell reporting that a command was not found
+/command not found/ { print; next }
+# Match Puppet explicitly reporting it could not find a command
+/Could not find command/ { print; next }
+# Match missing command for a specific provider
+/Command .* is missing/ { print; next }
+# Match missing executables for posix commands
+/Could not execute posix command: No such file or directory/ { print; next }
+' data/logs/puppet
+  precision=0.9752 recall=1.0000 f1=0.9874 TP=118 FP=3 FN=0 returned=121 must=118
+  may_precision=0.9752 may_recall=1.0000 may_f1=0.9874 may_TP=118 may_FP=3 may_FN=0 may=118
+  retries=0
+  input_tokens=46077 output_tokens=139
+  elapsed_seconds=19.38
+
+ID: puppet_query_9 | type: where | query: Find log lines showing certificate validation or trust failures during remote Puppet communication.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines indicating certificate verification or trust failures during SSL connection
+/certificate verify failed/ || /certificate revoked/ || /CRL is not yet valid/ {
+    print $0
+}' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=128 FP=0 FN=0 returned=128 must=128
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=128 may_FP=0 may_FN=0 may=128
+  retries=0
+  input_tokens=46076 output_tokens=68
+  elapsed_seconds=18.56
+
+ID: puppet_select_1 | type: select | query: Find the hosts that experienced remote catalog retrieval failures.
+  requested output format=host
+  requested output data type=string
+  command: awk '/Could not retrieve catalog from remote server/ && !seen[$4]++ {print $4}' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=18 FP=0 FN=0 returned=18 must=18
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=18 may_FP=0 may_FN=0 may=18
+  retries=0
+  input_tokens=46238 output_tokens=46
+  elapsed_seconds=18.54
+
+ID: puppet_select_2 | type: select | query: Find the configuration versions that were applied during Puppet runs.
+  requested output format=configuration_version
+  requested output data type=string
+  command: awk -F "Applying configuration version " '
+# Check if the line contains our target string
+NF > 1 {
+    val = $2
+    # Check if the version is enclosed in quotes (single or double)
+    if (val ~ /^[\047"]/) {
+        q = substr(val, 1, 1)
+        split(substr(val, 2), a, q)
+        version = a[1]
+    } else {
+        # Unquoted version, assume it is space-delimited
+        split(val, a, " ")
+        version = a[1]
+    }
+    
+    # Strip carriage return if present
+    sub(/\r$/, "", version)
+    
+    if (version != "") {
+        print version
+    }
+}' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=93 FP=0 FN=0 returned=93 must=93
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=93 may_FP=0 may_FN=0 may=93
+  retries=0
+  input_tokens=46243 output_tokens=213
+  elapsed_seconds=35.15
+
+ID: puppet_select_3 | type: select | query: Find the resource identifiers that were skipped because of failed dependencies.
+  requested output format=resource_identifier
+  requested output data type=string
+  command: awk '/) Skipping because of failed dependencies/ { s = index($0, ": (") + 3; e = index($0, ") Skipping because of failed dependencies"); if (s > 3 && e > s) print substr($0, s, e - s) }' data/logs/puppet
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1691 FP=0 FN=0 returned=1691 must=1691
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1691 may_FP=0 may_FN=0 may=1691
+  retries=0
+  input_tokens=46244 output_tokens=87
+  elapsed_seconds=32.96
+
+# Macro Averages (where/select queries)
+# precision=0.9963 recall=1.0000 f1=0.9981
+# may_precision=0.9963 may_recall=1.0000 may_f1=0.9981
+# retries_total=0 retries_avg=0.00
+# total_input_tokens=553419 total_output_tokens=917
+# total_elapsed=217.13s avg_elapsed=18.09s
+# Worst 5 queries by f1
+# 1. puppet_query_8 | type: where | f1=0.9874 | query: Find log lines where Puppet reports that a needed command could not be found.
+# 2. puppet_query_1 | type: where | f1=0.9900 | query: Find log lines indicating Puppet runs were disabled by an administrative action.
+# 3. puppet_query_2 | type: where | f1=1.0000 | query: Find log lines indicating Puppet execution was re-enabled after being disabled.
+# 4. puppet_query_3 | type: where | f1=1.0000 | query: Find log lines where Puppet says it could not fetch the node definition it needed.
+# 5. puppet_query_4 | type: where | f1=1.0000 | query: Find log lines showing the agent could not retrieve its catalog from a remote source.

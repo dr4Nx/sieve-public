@@ -1,0 +1,1377 @@
+# Evaluation report generated 20260429-133207
+# Source JSON: queries/dhcp_simple.json
+# Log file input: data/logs/dhcp
+# Log file resolved: data/logs/dhcp
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 1
+# Max retries: 4
+# Timeout: 600
+# Queries evaluated: 32
+
+ID: dhcp_query_1 | type: where | query: Return lines assigning an IP to host laphroaig
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Match lines that mention the host 'laphroaig' and indicate an IP assignment 
+    # (DHCPACK from server, or 'bound to' / 'leased' logged by the client)
+    pattern = re.compile(r'(?=.*\blaphroaig\b)(?=.*(\bDHCPACK\b|\bbound to\b|\bleased\b))', re.IGNORECASE)
+    
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if pattern.search(line):
+                sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=0.5000 recall=1.0000 f1=0.6667 TP=23 FP=23 FN=0 returned=46 must=23
+  may_precision=0.5000 may_recall=1.0000 may_f1=0.6667 may_TP=23 may_FP=23 may_FN=0 may=23
+  retries=0
+  input_tokens=798 output_tokens=223
+  elapsed_seconds=80.75
+
+ID: dhcp_query_2 | type: where | query: Return log lines reporting DHCP server IP addresses that are not broadcast addresses
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    log_file = sys.argv[1]
+    
+    # The regex targets standard dhclient log structures.
+    # Group 1 captures the server IP from incoming messages (ACK, OFFER, NAK).
+    # Group 2 captures the server IP from outgoing messages directed to port 67.
+    pattern = re.compile(
+        r'\b(?:DHCPACK|DHCPOFFER|DHCPNAK)\b.*?\bfrom\s+(\d{1,3}(?:\.\d{1,3}){3})\b'
+        r'|'
+        r'\b(?:DHCPREQUEST|DHCPRELEASE|DHCPDECLINE|DHCPDISCOVER|DHCPINFORM)\b.*?\bto\s+(\d{1,3}(?:\.\d{1,3}){3})\s+port\s+67\b'
+    )
+    
+    try:
+        with open(log_file, 'r', errors='ignore') as f:
+            for line in f:
+                m = pattern.search(line)
+                if m:
+                    ip = m.group(1) or m.group(2)
+                    # Exclude the generic broadcast address and typical directed broadcast addresses
+                    if ip != '255.255.255.255' and not ip.endswith('.255'):
+                        print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.9984 f1=0.9992 TP=152453 FP=0 FN=237 returned=152453 must=152690
+  may_precision=1.0000 may_recall=0.9984 may_f1=0.9992 may_TP=152453 may_FP=0 may_FN=237 may=152690
+  retries=0
+  input_tokens=800 output_tokens=395
+  elapsed_seconds=89.3
+
+ID: dhcp_query_3 | type: where | query: Return all log lines for transaction ID 0x6520bf0e
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+from datetime import datetime
+
+def parse_syslog_time(ts_str):
+    # Append a known leap year to ensure Feb 29 parsing works.
+    # Since logs might cross years, we use relative seconds for short transaction gap detection.
+    clean_ts = re.sub(r'\s+', ' ', ts_str.strip()) + " 2024"
+    try:
+        dt = datetime.strptime(clean_ts, "%b %d %H:%M:%S %Y")
+        return dt.timetuple().tm_yday * 86400 + dt.hour * 3600 + dt.minute * 60 + dt.second
+    except ValueError:
+        return -1
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    filepath = sys.argv[1]
+    target_xid = '0x6520bf0e'.lower()
+    
+    # Standard syslog regex handling optional hostname.
+    # Group 1: Time, Group 2: Host (optional), Group 3: Process/PID, Group 4: Message
+    syslog_re = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+(?:(\S+)\s+)?([^:\s]+(?:\[\d+\])?):\s+(.*)$')
+    xid_re = re.compile(r'\b(0x[0-9a-fA-F]+)\b')
+    mac_re = re.compile(r'\b(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b')
+    
+    # Track active transactions to group context lines securely.
+    active_tx = {} # (host, proc) -> list of { 'chunk_id', 'last_time', 'xids', 'macs' }
+    chunk_xids = {}
+    line_sequence = []
+    
+    chunk_counter = 0
+    
+    try:
+        with open(filepath, 'r', errors='replace') as f:
+            for line in f:
+                m = syslog_re.match(line)
+                if not m:
+                    # Unrecognized line format, treat as standalone context.
+                    chunk_counter += 1
+                    has_target = target_xid in line.lower()
+                    chunk_xids[chunk_counter] = {target_xid} if has_target else set()
+                    line_sequence.append((chunk_counter, line))
+                    continue
+                    
+                ts_str = m.group(1)
+                host = m.group(2) or "unknown"
+                proc = m.group(3)
+                msg = m.group(4)
+                
+                hp = (host, proc)
+                t_sec = parse_syslog_time(ts_str)
+                xids = set(x.lower() for x in xid_re.findall(msg))
+                macs = set(x.lower() for x in mac_re.findall(msg))
+                
+                if hp not in active_tx:
+                    active_tx[hp] = []
+                    
+                # Prune inactive contexts older than 120 seconds or negative time drifts.
+                recent_tx = []
+                for tx in active_tx[hp]:
+                    time_diff = t_sec - tx['last_time'] if t_sec != -1 and tx['last_time'] != -1 else 0
+                    if 0 <= time_diff <= 120:
+                        recent_tx.append(tx)
+                active_tx[hp] = recent_tx
+                
+                matched_tx = None
+                
+                # 1. Match active transaction primarily by explicit Transaction ID.
+                if xids:
+                    for tx in active_tx[hp]:
+                        if tx['xids'].intersection(xids):
+                            matched_tx = tx
+                            break
+                            
+                # 2. If no Transaction ID match, infer relation via MAC Address.
+                if not matched_tx and macs:
+                    for tx in reversed(active_tx[hp]):
+                        if tx['macs'].intersection(macs):
+                            if not xids or not tx['xids'] or tx['xids'].intersection(xids):
+                                matched_tx = tx
+                                break
+                                
+                # 3. Fallback: match most recent unambiguous transaction for that Process ID.
+                if not matched_tx and not xids and not macs and active_tx[hp]:
+                    matched_tx = active_tx[hp][-1]
+                    
+                if matched_tx:
+                    matched_tx['xids'].update(xids)
+                    matched_tx['macs'].update(macs)
+                    if t_sec != -1:
+                        matched_tx['last_time'] = t_sec
+                    chunk_xids[matched_tx['chunk_id']].update(xids)
+                    # Enforce literal safety check just in case boundaries differ.
+                    if target_xid in line.lower():
+                        chunk_xids[matched_tx['chunk_id']].add(target_xid)
+                    line_sequence.append((matched_tx['chunk_id'], line))
+                    # Mark as most recently active.
+                    active_tx[hp].remove(matched_tx)
+                    active_tx[hp].append(matched_tx)
+                else:
+                    chunk_counter += 1
+                    new_tx = {
+                        'chunk_id': chunk_counter,
+                        'last_time': t_sec,
+                        'xids': xids.copy(),
+                        'macs': macs.copy()
+                    }
+                    active_tx[hp].append(new_tx)
+                    chunk_xids[chunk_counter] = xids.copy()
+                    if target_xid in line.lower():
+                        chunk_xids[chunk_counter].add(target_xid)
+                    line_sequence.append((chunk_counter, line))
+                    
+        # Finally, output all correlated loglines maintaining exact file ordering.
+        for cid, line in line_sequence:
+            if target_xid in chunk_xids.get(cid, set()):
+                print(line, end='')
+
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4100 FP=0 FN=0 returned=4100 must=4100
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4100 may_FP=0 may_FN=0 may=4100
+  retries=0
+  input_tokens=804 output_tokens=1573
+  elapsed_seconds=189.21
+
+ID: dhcp_query_4 | type: where | query: Get all lines reporting MAC addresses for host laphroaig
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Matches syslog standard timestamp followed by host laphroaig
+    host_re = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+laphroaig\b')
+    
+    # Matches a standard MAC address (e.g., 00:1A:2B:3C:4D:5E or 0:1a:2b:3c:4d:5e)
+    mac_re = re.compile(r'\b(?:[0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}\b')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if host_re.search(line) and mac_re.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=46 FP=0 FN=0 returned=46 must=46
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=46 may_FP=0 may_FN=0 may=46
+  retries=0
+  input_tokens=799 output_tokens=324
+  elapsed_seconds=24.87
+
+ID: dhcp_query_5 | type: where | query: List all log lines reporting IP assignments with lease durations over a day
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def parse_duration(val_str, unit_str):
+    val = int(val_str)
+    if not unit_str:
+        return val
+    u = unit_str.lower()
+    if u.startswith('s'): return val
+    if u.startswith('mo'): return val * 2592000
+    if u.startswith('m'): return val * 60
+    if u.startswith('h'): return val * 3600
+    if u.startswith('d'): return val * 86400
+    if u.startswith('w'): return val * 604800
+    if u.startswith('y'): return val * 31536000
+    return val
+
+def process_log(file_path):
+    # Pattern to detect lines that report an IP assignment
+    assignment_pattern = re.compile(r'\b(DHCPACK|bound\s+to|leased|lease\s+of)\b', re.IGNORECASE)
+    
+    unit_regex = r'(second|sec|s|minute|min|m|hour|hr|h|day|d|week|w|month|mo|year|y)s?'
+    
+    # Explicit lease duration mentions like "lease time 86405", "for 2 days"
+    explicit_pattern = re.compile(
+        r'\b(?:lease\s+time|lease\s+duration|lease|duration|for)\s+(?:is\s+|:\s+)?(\d+)(?:\s*' + unit_regex + r'\b)?',
+        re.IGNORECASE
+    )
+    
+    # Infinite lease explicitly
+    infinite_pattern = re.compile(
+        r'\b(?:lease\s+time|lease\s+duration|lease|duration|for)\s+(?:is\s+|:\s+)?(infinite|infinity|forever)\b',
+        re.IGNORECASE
+    )
+
+    # Renewal time which is typically 50% of the lease duration
+    renewal_pattern = re.compile(
+        r'\brenewal\s+in\s+(\d+)(?:\s*' + unit_regex + r'\b)?',
+        re.IGNORECASE
+    )
+
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            # Only evaluate lines that report an IP assignment
+            if not assignment_pattern.search(line):
+                continue
+
+            found = False
+            
+            if infinite_pattern.search(line):
+                found = True
+            
+            if not found:
+                for m in explicit_pattern.finditer(line):
+                    secs = parse_duration(m.group(1), m.group(2))
+                    if secs > 86400:
+                        found = True
+                        break
+
+            if not found:
+                for m in renewal_pattern.finditer(line):
+                    secs = parse_duration(m.group(1), m.group(2))
+                    # Since renewal is typically half the lease time, > 43200 implies lease > 1 day
+                    if secs > 43200:
+                        found = True
+                        break
+
+            if found:
+                print(line, end='')
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_log(sys.argv[1])
+  precision=0.9487 recall=0.9993 f1=0.9734 TP=2996 FP=162 FN=2 returned=3158 must=2998
+  may_precision=0.9487 may_recall=0.9993 may_f1=0.9734 may_TP=2996 may_FP=162 may_FN=2 may=2998
+  retries=0
+  input_tokens=800 output_tokens=862
+  elapsed_seconds=132.28
+
+ID: dhcp_query_6 | type: where | query: List all log lines reporting DHCP destination IPs running on non standard ports
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Matches 'to <IP> port <PORT>' to identify destination IPs and ports
+    # Handles both IPv4 and IPv6 formats
+    pattern = re.compile(r'\bto\s+((?:\d{1,3}(?:\.\d{1,3}){3})|(?:[0-9a-fA-F:]+:[0-9a-fA-F:]+))\s+port\s+(\d+)')
+    
+    # DHCP standard ports: 67 (server), 68 (client), 546 (DHCPv6 client), 547 (DHCPv6 server)
+    standard_ports = {'67', '68', '546', '547'}
+    
+    try:
+        with open(file_path, 'r', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    port = match.group(2)
+                    if port not in standard_ports:
+                        sys.stdout.write(line)
+    except FileNotFoundError:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.8889 f1=0.9412 TP=8 FP=0 FN=1 returned=8 must=9
+  may_precision=1.0000 may_recall=0.8889 may_f1=0.9412 may_TP=8 may_FP=0 may_FN=1 may=9
+  retries=0
+  input_tokens=800 output_tokens=344
+  elapsed_seconds=25.92
+
+ID: dhcp_query_7 | type: where | query: List all log lines reporting hosts using client version 3.0.1
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Match 'client' (case-insensitive, will match 'dhclient', 'Client', etc.)
+    client_re = re.compile(r'(?i)client')
+    # Match '3.0.1' or 'v3.0.1', ensuring it's not part of an IP address (like 10.3.0.1) or another word/number
+    version_re = re.compile(r'(?i)(?<![\w\.])v?3\.0\.1(?![\.\w])')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if client_re.search(line) and version_re.search(line):
+                    print(line, end='')
+    except FileNotFoundError:
+        pass
+
+if __name__ == "__main__":
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5 FP=0 FN=0 returned=5 must=5
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5 may_FP=0 may_FN=0 may=5
+  retries=0
+  input_tokens=802 output_tokens=284
+  elapsed_seconds=41.26
+
+ID: dhcp_query_8 | type: where | query: List all log lines reporting DHCPDISCOVER messages
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    filepath = sys.argv[1]
+    pattern = re.compile(r'\bDHCPDISCOVER\b')
+    
+    try:
+        with open(filepath, 'r', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except FileNotFoundError:
+        pass
+
+if __name__ == "__main__":
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=37738 FP=0 FN=0 returned=37738 must=37738
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=37738 may_FP=0 may_FN=0 may=37738
+  retries=0
+  input_tokens=796 output_tokens=150
+  elapsed_seconds=15.98
+
+ID: dhcp_query_9 | type: where | query: List all log lines reporting XMT Renew messages
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    file_path = sys.argv[1]
+    pattern = re.compile(r'\bXMT:?\s+Renew\b', re.IGNORECASE)
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if pattern.search(line):
+                print(line, end='')
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=4 FP=0 FN=0 returned=4 must=4
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=4 may_FP=0 may_FN=0 may=4
+  retries=0
+  input_tokens=796 output_tokens=148
+  elapsed_seconds=19.62
+
+ID: dhcp_query_10 | type: where | query: Return logs reporting bad IP checksums
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    pattern = re.compile(r"bad\s+ip\s+checksum", re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=8 FP=0 FN=0 returned=8 must=8
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=8 may_FP=0 may_FN=0 may=8
+  retries=0
+  input_tokens=794 output_tokens=166
+  elapsed_seconds=11.49
+
+ID: dhcp_select_1 | type: select | query: Return DHCP server IP addresses that are not broadcast addresses
+  requested output format=server_ip
+  requested output data type=string
+  command: import sys
+import re
+import ipaddress
+
+def extract_dhcp_server_ips():
+    if len(sys.argv) < 2:
+        return
+    
+    # Regular expression to match DHCP server IPs in client logs
+    # Cases covered:
+    # - 'to <IP> port 67' (e.g., DHCPREQUEST to a specific server)
+    # - 'from <IP>' (e.g., DHCPOFFER, DHCPACK, DHCPNAK from a server)
+    pattern = re.compile(r'\b(?:to\s+(\d{1,3}(?:\.\d{1,3}){3})\s+port\s+67|from\s+(\d{1,3}(?:\.\d{1,3}){3}))\b')
+    
+    file_path = sys.argv[1]
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                for match in pattern.finditer(line):
+                    ip_str = match.group(1) or match.group(2)
+                    try:
+                        # Validate IP address
+                        ip = ipaddress.IPv4Address(ip_str)
+                        # Exclude the global broadcast address
+                        if ip_str != '255.255.255.255':
+                            print(ip_str)
+                    except ipaddress.AddressValueError:
+                        pass
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    extract_dhcp_server_ips()
+  precision=1.0000 recall=0.9573 f1=0.9782 TP=807 FP=0 FN=36 returned=807 must=843
+  may_precision=1.0000 may_recall=0.9573 may_f1=0.9782 may_TP=807 may_FP=0 may_FN=36 may=843
+  retries=0
+  input_tokens=967 output_tokens=403
+  elapsed_seconds=56.35
+
+ID: dhcp_select_2 | type: select | query: Find the MAC addresses reported for host laphroaig
+  requested output format=mac_address
+  requested output data type=string
+  command: import sys
+import re
+
+def process():
+    if len(sys.argv) < 2:
+        return
+    filepath = sys.argv[1]
+    
+    # Regular expression to match MAC addresses (e.g. 00:11:22:33:44:55 or 00-11-22-33-44-55)
+    mac_regex = re.compile(r'\b([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})\b')
+    # Regular expression to match the target hostname
+    host_regex = re.compile(r'\blaphroaig\b', re.IGNORECASE)
+    # Regular expression to match standard BSD syslog format headers
+    syslog_re = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+)(\S+)(\s+.*)$')
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                m = syslog_re.match(line)
+                if m:
+                    # m.group(2) is the syslog host (the logging machine)
+                    # m.group(3) contains the process name and the actual message
+                    # We ensure the hostname 'laphroaig' is found in the message to avoid 
+                    # grabbing MACs belonging to other hosts when laphroaig is just the logger.
+                    if host_regex.search(m.group(3)):
+                        for mac in mac_regex.findall(m.group(3)):
+                            print(mac)
+                else:
+                    # For non-standard log lines, fall back to searching the entire line
+                    if host_regex.search(line):
+                        for mac in mac_regex.findall(line):
+                            print(mac)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    process()
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=2 returned=0 must=2
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=0 may_FN=2 may=2
+  retries=0
+  input_tokens=968 output_tokens=533
+  elapsed_seconds=81.79
+
+ID: dhcp_select_3 | type: select | query: Return all IPs that were assigned with lease durations over a day
+  command: import sys
+import re
+import argparse
+
+def parse_dhcp_logs(filepath):
+    # Regex for standard syslog headers
+    syslog_re = re.compile(r'^(?:<[0-9]+>)?(?P<ts>[A-Z][a-z]{2}\s+\d+\s+\d+:\d+:\d+|\d{4}-\d{2}-\d{2}T\d+:\d+:\d+\S+)\s+(?P<host>\S+)\s+(?P<proc>[a-zA-Z0-9_\-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<msg>.*)')
+    
+    # Regex for assigned IPs
+    ip_re = re.compile(r'(?:DHCPACK(?:[^)]*\))?\s+(?:on\s+)?|bound to\s+|assigned\s+(?:IP address\s+)?|Lease of\s+|DHCPv4 address\s+(?:(?:[a-zA-Z0-9_\-]+)?:\s+)?)(?P<ip>\d{1,3}(?:\.\d{1,3}){3})', re.IGNORECASE)
+    
+    # Regex for duration extraction
+    dur_re = re.compile(r'(lease[\s\-]?time|lease[\s\-]?duration|lease|duration|expire[\s\-]?in|valid[\s\-]?for|renewal[\s\-]?in|for)\s*(?:=|:)?\s*(?P<val>\d+)\s*(?P<unit>s|sec|second|seconds|m|min|minute|minutes|h|hr|hour|hours|d|day|days)?\b', re.IGNORECASE)
+    inf_re = re.compile(r'(lease[\s\-]?time|lease[\s\-]?duration|lease|duration|expire[\s\-]?in|valid[\s\-]?for|renewal[\s\-]?in|for)\s*(?:=|:)?\s*(infinite|forever)\b', re.IGNORECASE)
+    
+    # Regex for transaction IDs and interfaces
+    xid_re = re.compile(r'xid[=:\s](0x[0-9a-fA-F]+|[0-9a-fA-F]+)\b', re.IGNORECASE)
+    iface_re = re.compile(r'(?:on|via)\s+(?P<iface>[a-zA-Z0-9_\-]+)')
+    
+    transactions = {}
+    process_fallback = {}
+    seen_ips = set()
+    
+    def check_and_emit(ip, duration):
+        if ip is not None and duration is not None:
+            # User query explicitly asks for duration *over* a day (> 86400 seconds)
+            if duration > 86400:
+                if ip not in seen_ips:
+                    print(ip)
+                    seen_ips.add(ip)
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                m = syslog_re.match(line)
+                if m:
+                    ts = m.group('ts')
+                    host = m.group('host')
+                    proc = m.group('proc')
+                    pid = m.group('pid') or 'unknown'
+                    msg = m.group('msg')
+                else:
+                    ts, host, proc, pid, msg = None, 'unknown', 'unknown', 'unknown', line
+                    
+                # Extract transaction ID
+                xid_m = xid_re.search(msg)
+                xid = xid_m.group(1) if xid_m else None
+                
+                # Extract interface
+                iface_m = iface_re.search(msg)
+                iface = iface_m.group('iface') if iface_m else None
+                
+                # Extract IP
+                ip_m = ip_re.search(msg)
+                ip = ip_m.group('ip') if ip_m else None
+                
+                # Extract duration
+                duration = None
+                dur_m = dur_re.search(msg)
+                if dur_m:
+                    kw = dur_m.group(1).lower()
+                    val = int(dur_m.group('val'))
+                    unit = dur_m.group('unit')
+                    if unit:
+                        u = unit.lower()
+                        if u.startswith('d'): val *= 86400
+                        elif u.startswith('h'): val *= 3600
+                        elif u.startswith('m'): val *= 60
+                    # renewals are generally half the lease time
+                    if 'renewal' in kw:
+                        val *= 2
+                    duration = val
+                elif inf_re.search(msg):
+                    duration = float('inf')
+                    
+                # Create explicit intermediate record for stateful logic (as per guardrails)
+                record = {
+                    'event_type': 'dhcp_event',
+                    'timestamp': ts,
+                    'client': host,
+                    'host': host,
+                    'process_id': pid,
+                    'transaction_id': xid,
+                    'interface': iface,
+                    'ip': ip,
+                    'duration': duration
+                }
+                
+                # Intra-line check
+                check_and_emit(ip, duration)
+                
+                # Stateful checks across lines
+                if xid:
+                    key = (host, xid)
+                    if key not in transactions:
+                        transactions[key] = {'ip': None, 'duration': None}
+                    if ip:
+                        transactions[key]['ip'] = ip
+                    if duration is not None:
+                        transactions[key]['duration'] = duration
+                    check_and_emit(transactions[key]['ip'], transactions[key]['duration'])
+                else:
+                    key = (host, pid)
+                    if key not in process_fallback:
+                        process_fallback[key] = {'ip': None, 'duration': None}
+                    if ip:
+                        process_fallback[key]['ip'] = ip
+                    if duration is not None:
+                        process_fallback[key]['duration'] = duration
+                    check_and_emit(process_fallback[key]['ip'], process_fallback[key]['duration'])
+                    
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('logfile')
+    args = parser.parse_args()
+    parse_dhcp_logs(args.logfile)
+  precision=0.9270 recall=0.9792 f1=0.9524 TP=330 FP=26 FN=7 returned=356 must=337
+  may_precision=0.9270 may_recall=0.9792 may_f1=0.9524 may_TP=330 may_FP=26 may_FN=7 may=337
+  retries=1
+  input_tokens=1631 output_tokens=3056
+  elapsed_seconds=362.69
+
+ID: dhcp_select_4 | type: select | query: Find the unique DHCP destination IPs used with non-standard ports
+  requested output format=destination_ip
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    unique_ips = set()
+    # Match patterns like 'to 172.16.27.1 port 67' or 'dst 10.0.0.1 port 8080'
+    pattern = re.compile(r'\b(?:to|dst|destination)\s+([0-9a-fA-F:\.]+)\s+port\s+([0-9]+)', re.IGNORECASE)
+    
+    # Standard DHCP server and client ports for IPv4 (67, 68) and IPv6 (546, 547)
+    standard_ports = {'67', '68', '546', '547'}
+    
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    ip = match.group(1)
+                    port = match.group(2)
+                    # Ensure it looks like an IP (contains dot or colon) to avoid matching stray words
+                    if ('.' in ip or ':' in ip) and not ip.endswith('.'):
+                        if port not in standard_ports:
+                            unique_ips.add(ip)
+    except Exception:
+        pass
+        
+    for ip in sorted(unique_ips):
+        print(ip)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.6667 f1=0.8000 TP=2 FP=0 FN=1 returned=2 must=3
+  may_precision=1.0000 may_recall=0.6667 may_f1=0.8000 may_TP=2 may_FP=0 may_FN=1 may=3
+  retries=0
+  input_tokens=969 output_tokens=395
+  elapsed_seconds=44.01
+
+ID: dhcp_select_5 | type: select | query: Find the hosts using DHCP client version 3.0.1
+  requested output format=hostname
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Matches standard syslog dates like "Nov  8 08:03:03" or "Nov 08 08:03:03"
+    syslog_re = re.compile(r'^[A-Z][a-z]{2}\s+\d+(?:\s+\d{4})?\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+(.*)$')
+    # Safely match "3.0.1" or "V3.0.1" while avoiding IP addresses like 10.3.0.1
+    version_re = re.compile(r'(?i)(?<![\d.])[vV]?3\.0\.1(?![.\d])')
+    
+    seen_hosts = set()
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m = syslog_re.match(line)
+                if m:
+                    hostname = m.group(1)
+                    rest = m.group(2)
+                    
+                    if version_re.search(rest):
+                        rest_lower = rest.lower()
+                        # Check if the line is related to a DHCP client
+                        if 'dhcp' in rest_lower or 'dhclient' in rest_lower or 'client' in rest_lower:
+                            if hostname not in seen_hosts:
+                                seen_hosts.add(hostname)
+                                print(hostname)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=966 output_tokens=447
+  elapsed_seconds=57.13
+
+ID: dhcp_select_6 | type: select | query: List all hosts which sent a DHCPDISCOVER messages
+  command: import sys
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    filepath = sys.argv[1]
+    
+    hosts = set()
+    months = {'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'}
+              
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'DHCPDISCOVER' in line:
+                    # Exclude server-side receive messages
+                    if 'DHCPDISCOVER from' in line:
+                        continue
+                        
+                    parts = line.split()
+                    if not parts:
+                        continue
+                        
+                    host = None
+                    process_field = ""
+                    
+                    # Traditional syslog (e.g. Nov 8 08:03:03 x-www dhclient: ...)
+                    if parts[0] in months:
+                        if len(parts) >= 5 and ':' in parts[2]:
+                            host = parts[3]
+                            process_field = parts[4].lower()
+                        # Traditional syslog with year (e.g. Nov 8 2023 08:03:03 x-www dhclient: ...)
+                        elif len(parts) >= 6 and ':' in parts[3]:
+                            host = parts[4]
+                            process_field = parts[5].lower()
+                    # ISO 8601 timestamp (e.g. 2023-11-08T08:03:03Z x-www dhclient: ...)
+                    elif len(parts[0]) >= 10 and parts[0][4] == '-' and parts[0][7] == '-' and 'T' in parts[0] and len(parts) >= 4:
+                        host = parts[1]
+                        process_field = parts[2].lower()
+                        
+                    if host:
+                        # Double-check we're not parsing a DHCP server's log
+                        if any(srv in process_field for srv in ['dhcpd', 'dnsmasq', 'dhcrelay', 'kea']):
+                            continue
+                        hosts.add(host)
+                        
+    except Exception:
+        pass
+        
+    for host in sorted(hosts):
+        print(host)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.9969 f1=0.9985 TP=645 FP=0 FN=2 returned=645 must=647
+  may_precision=1.0000 may_recall=0.9969 may_f1=0.9985 may_TP=645 may_FP=0 may_FN=2 may=647
+  retries=0
+  input_tokens=797 output_tokens=605
+  elapsed_seconds=71.16
+
+ID: dhcp_select_7 | type: select | query: Find the unique hosts reporting an XMT Renew message
+  requested output format=hostname
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+        
+    log_file = sys.argv[1]
+    syslog_regex = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(?P<host>\S+)')
+    target_regex = re.compile(r'XMT\W*Renew', re.IGNORECASE)
+    
+    hosts = set()
+    
+    with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if target_regex.search(line):
+                m = syslog_regex.match(line)
+                if m:
+                    hosts.add(m.group('host'))
+                    
+    for h in sorted(hosts):
+        print(h)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2 FP=0 FN=0 returned=2 must=2
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2 may_FP=0 may_FN=0 may=2
+  retries=0
+  input_tokens=963 output_tokens=261
+  elapsed_seconds=22.54
+
+ID: simple_1 | type: where | query: Show all DHCPACK messages
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def filter_logs(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if 'DHCPACK' in line:
+                    sys.stdout.write(line)
+    except OSError:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        filter_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=35522 FP=0 FN=0 returned=35522 must=35522
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=35522 may_FP=0 may_FN=0 may=35522
+  retries=0
+  input_tokens=792 output_tokens=130
+  elapsed_seconds=9.73
+
+ID: simple_2 | type: where | query: Find logs from interface eth0
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    pattern = re.compile(r'\beth0\b')
+    try:
+        with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.9973 recall=1.0000 f1=0.9987 TP=69491 FP=186 FN=0 returned=69677 must=69491
+  may_precision=0.9973 may_recall=1.0000 may_f1=0.9987 may_TP=69491 may_FP=186 may_FN=0 may=69491
+  retries=0
+  input_tokens=793 output_tokens=151
+  elapsed_seconds=17.48
+
+ID: simple_3 | type: where | query: Show messages from host localhost
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Matches traditional syslog (e.g., "Nov  8 08:03:03") or ISO-8601 like timestamps
+    # followed by the host field.
+    syslog_re = re.compile(
+        r'^('
+        r'[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}'
+        r'|'
+        r'\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?'
+        r')\s+(?P<host>\S+)\s+'
+    )
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                match = syslog_re.search(line)
+                if match and match.group('host') == 'localhost':
+                    print(line, end='')
+    except IOError:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=96724 FP=0 FN=0 returned=96724 must=96724
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=96724 may_FP=0 may_FN=0 may=96724
+  retries=0
+  input_tokens=792 output_tokens=340
+  elapsed_seconds=34.57
+
+ID: complex_1 | type: where | query: Find DHCPREQUEST messages on interface eth0 from host localhost with port 67
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_file(filepath):
+    # Regex to parse standard syslog headers and accurately extract the host field
+    host_pattern = re.compile(r'^(?:[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+(\S+)')
+    eth0_re = re.compile(r'\beth0\b')
+    port67_re = re.compile(r'\bport 67\b')
+
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'DHCPREQUEST' not in line:
+                    continue
+                if not eth0_re.search(line):
+                    continue
+                if not port67_re.search(line):
+                    continue
+                
+                # Check host explicitly if parsable, else fallback to word boundary search
+                m = host_pattern.search(line)
+                if m:
+                    if m.group(1) != 'localhost':
+                        continue
+                else:
+                    if not re.search(r'\blocalhost\b', line):
+                        continue
+
+                print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=11698 FP=0 FN=0 returned=11698 must=11698
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=11698 may_FP=0 may_FN=0 may=11698
+  retries=0
+  input_tokens=803 output_tokens=422
+  elapsed_seconds=47.07
+
+ID: complex_2 | type: where | query: Show DHCPOFFER or DHCPACK messages from server 192.168.1.1
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    # Match lines containing DHCPOFFER or DHCPACK, and the server IP 192.168.1.1
+    pattern = re.compile(r'\b(DHCPOFFER|DHCPACK)\b.*\b192\.168\.1\.1\b')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5490 FP=0 FN=0 returned=5490 must=5490
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5490 may_FP=0 may_FN=0 may=5490
+  retries=0
+  input_tokens=810 output_tokens=208
+  elapsed_seconds=24.11
+
+ID: complex_3 | type: where | query: Find all DHCP messages with transaction ID starting with 0x7
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Match DHCP transaction IDs starting with 0x7
+    # Matches variations like: xid=0x7..., xid 0x7..., Transaction ID: 0x7...
+    txid_pattern = re.compile(r'(?i)\b(?:xid|txid|transaction[-\s_]?id|trans[-\s_]?id)[\s=:]*0x7[0-9a-f]*\b')
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if txid_pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6883 FP=0 FN=0 returned=6883 must=6883
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=6883 may_FP=0 may_FN=0 may=6883
+  retries=0
+  input_tokens=800 output_tokens=245
+  elapsed_seconds=31.92
+
+ID: vague_1 | type: where | query: Show me DHCP errors
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    
+    file_path = sys.argv[1]
+    error_pattern = re.compile(r'\b(?:error|fail|failed|failure|fatal|bad|invalid|err)\b', re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if error_pattern.search(line):
+                    print(line, end='')
+    except FileNotFoundError:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.0983 f1=0.1791 TP=2202 FP=0 FN=20192 returned=2202 must=22394
+  may_precision=1.0000 may_recall=0.0758 may_f1=0.1409 may_TP=2202 may_FP=0 may_FN=26844 may=29046
+  retries=0
+  input_tokens=791 output_tokens=184
+  elapsed_seconds=15.12
+
+ID: vague_2 | type: where | query: Find network problems
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    # Regex to match common network/DHCP problem indicators
+    pattern = re.compile(r'(?i)(error|fail|timeout|timed out|drop|unreachable|\bdown\b|\bbad\b|refused|denied|conflict|no free leases|decline|nak|no dhcpoffer)')
+    
+    with open(sys.argv[1], 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if pattern.search(line):
+                sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=0.7834 recall=0.5448 f1=0.6427 TP=10922 FP=3019 FN=9127 returned=13941 must=20049
+  may_precision=0.9258 may_recall=0.5530 may_f1=0.6924 may_TP=12906 may_FP=1035 may_FN=10434 may=23340
+  retries=0
+  input_tokens=790 output_tokens=194
+  elapsed_seconds=23.81
+
+ID: numerical_1 | type: where | query: Find entries with process ID greater than 5000
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    filepath = sys.argv[1]
+    
+    # Matches standard syslog process ID format (e.g., "dhclient[5023]:") 
+    # within the first 100 characters of the line to avoid matching within the message body.
+    pattern = re.compile(r'^.{0,100}?\b[a-zA-Z0-9_-]+\[(\d+)\]:')
+    
+    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            match = pattern.search(line)
+            if match:
+                pid = int(match.group(1))
+                if pid > 5000:
+                    sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=104648 FP=0 FN=0 returned=104648 must=104648
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=104648 may_FP=0 may_FN=0 may=104648
+  retries=0
+  input_tokens=799 output_tokens=247
+  elapsed_seconds=52.95
+
+ID: numerical_2 | type: where | query: Show logs with retry interval less than 5
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    # Match standard dhclient interval formatting (e.g. '... interval 4')
+    interval_pattern = re.compile(r'\binterval\s+([0-9]+)\b', re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = interval_pattern.search(line)
+                if match:
+                    interval = int(match.group(1))
+                    if interval < 5:
+                        sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=5431 FP=0 FN=0 returned=5431 must=5431
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=5431 may_FP=0 may_FN=0 may=5431
+  retries=0
+  input_tokens=796 output_tokens=217
+  elapsed_seconds=23.84
+
+ID: time_1 | type: where | query: Show logs from June 18
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    
+    file_path = sys.argv[1]
+    # Matches 'Jun 18' at the beginning of the line, optionally preceded by a syslog priority like '<14>'
+    pattern = re.compile(r'^(?:<\d+>)?\s*Jun\s+18\b', re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1495 FP=0 FN=0 returned=1495 must=1495
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=1495 may_FP=0 may_FN=0 may=1495
+  retries=0
+  input_tokens=794 output_tokens=204
+  elapsed_seconds=23.23
+
+ID: time_2 | type: where | query: Find messages from September
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    log_file = sys.argv[1]
+    
+    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            if line.startswith('Sep '):
+                sys.stdout.write(line)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=57756 FP=0 FN=0 returned=57756 must=57756
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=57756 may_FP=0 may_FN=0 may=57756
+  retries=0
+  input_tokens=791 output_tokens=124
+  elapsed_seconds=13.0
+
+ID: select_1 | type: select | query: List all hosts that sent DHCPDISCOVER messages
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    syslog_re = re.compile(r'^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+(\S+)')
+    hosts = set()
+    
+    with open(sys.argv[1], 'r', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if 'DHCPDISCOVER' in line:
+                # If it's a server log, the host sent it from a MAC or hostname
+                if 'DHCPDISCOVER from' in line:
+                    m = re.search(r'DHCPDISCOVER from [0-9a-fA-F:]+\s+\(([^)]+)\)', line)
+                    if m:
+                        hosts.add(m.group(1))
+                    else:
+                        m2 = re.search(r'DHCPDISCOVER from ([0-9a-fA-F:]+)', line)
+                        if m2:
+                            hosts.add(m2.group(1))
+                else:
+                    # If it's a client log, the syslog hostname is the sender
+                    m = syslog_re.search(line)
+                    if m:
+                        hosts.add(m.group(1))
+                        
+    for h in sorted(hosts):
+        print(h)
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=0.9969 f1=0.9985 TP=645 FP=0 FN=2 returned=645 must=647
+  may_precision=1.0000 may_recall=0.9969 may_f1=0.9985 may_TP=645 may_FP=0 may_FN=2 may=647
+  retries=3
+  input_tokens=3283 output_tokens=2181
+  elapsed_seconds=275.62
+
+ID: select_2 | type: select | query: Find the original log timestamps from lines reporting a network is down error, using the timestamp text at the beginning of each matching log line.
+  requested output format=log_timestamp
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Matches standard syslog (e.g., Nov  8 08:03:03) or ISO 8601 timestamps
+    timestamp_pattern = re.compile(r'^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)')
+    error_pattern = re.compile(r'network is down', re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if error_pattern.search(line):
+                    match = timestamp_pattern.search(line)
+                    if match:
+                        print(match.group(1))
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1212 FP=0 FN=0 returned=1212 must=1212
+  may_precision=1.0000 may_recall=0.1306 may_f1=0.2311 may_TP=1212 may_FP=0 may_FN=8067 may=9279
+  retries=0
+  input_tokens=1012 output_tokens=315
+  elapsed_seconds=15.58
+
+ID: select_3 | type: select | query: For each DHCP log line where both are available, return the interface and message type
+  requested output format=interface_name,message_type
+  requested output data type=string,string
+  command: import sys
+import re
+import gzip
+
+def process_file(filepath):
+    # Match standard DHCP message types, optionally capturing an interface in immediately following parentheses (e.g., dnsmasq format)
+    msg_regex = re.compile(r'\b(DHCP(?:DISCOVER|OFFER|REQUEST|DECLINE|ACK|NAK|RELEASE|INFORM))\b(?:\s*\(([^)]+)\))?')
+    
+    # Match potential interfaces following 'on' or 'via' (e.g., ISC DHCP format)
+    on_via_regex = re.compile(r'\b(?:on|via)\s+([a-zA-Z0-9_.:-]+)\b')
+    
+    # Exclude patterns to filter out IPs and MACs mistakenly captured as interfaces
+    ipv4_regex = re.compile(r'^\d{1,3}(?:\.\d{1,3}){3}$')
+    hex_colon_regex = re.compile(r'^[0-9a-fA-F:]+$')
+
+    open_func = gzip.open if filepath.endswith('.gz') else open
+
+    try:
+        with open_func(filepath, 'rt', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                m = msg_regex.search(line)
+                if not m:
+                    continue
+                
+                msg_type = m.group(1)
+                raw_interface = m.group(2)
+                
+                interface = None
+                # Validate parenthesized interface if present
+                if raw_interface:
+                    if not ('=' in raw_interface or ipv4_regex.match(raw_interface) or (':' in raw_interface and hex_colon_regex.match(raw_interface))):
+                        interface = raw_interface
+
+                # Fallback to searching 'on' or 'via' clauses if no valid interface found yet
+                if not interface:
+                    candidates = on_via_regex.findall(line)
+                    valid_interfaces = []
+                    for c in candidates:
+                        if ipv4_regex.match(c):
+                            continue
+                        if ':' in c and hex_colon_regex.match(c):
+                            continue
+                        valid_interfaces.append(c)
+                    
+                    if valid_interfaces:
+                        # Typically, the last valid candidate represents the target interface
+                        interface = valid_interfaces[-1]
+
+                if msg_type and interface:
+                    print(f"{interface} {msg_type}")
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=0.9831 recall=0.8861 f1=0.9321 TP=350 FP=6 FN=45 returned=356 must=395
+  may_precision=0.9831 may_recall=0.8861 may_f1=0.9321 may_TP=350 may_FP=6 may_FN=45 may=395
+  retries=0
+  input_tokens=985 output_tokens=659
+  elapsed_seconds=85.07
+
+# Macro Averages (where/select queries)
+# precision=0.9419 recall=0.9067 f1=0.9081
+# may_precision=0.9463 may_recall=0.8790 may_f1=0.8845
+# retries_total=4 retries_avg=0.12
+# total_input_tokens=30081 total_output_tokens=15990
+# total_elapsed=2019.45s avg_elapsed=63.11s
+# Worst 5 queries by f1
+# 1. dhcp_select_2 | type: select | f1=0.0000 | query: Find the MAC addresses reported for host laphroaig
+# 2. vague_1 | type: where | f1=0.1791 | query: Show me DHCP errors
+# 3. vague_2 | type: where | f1=0.6427 | query: Find network problems
+# 4. dhcp_query_1 | type: where | f1=0.6667 | query: Return lines assigning an IP to host laphroaig
+# 5. dhcp_select_4 | type: select | f1=0.8000 | query: Find the unique DHCP destination IPs used with non-standard ports

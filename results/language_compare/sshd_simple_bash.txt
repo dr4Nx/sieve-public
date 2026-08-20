@@ -1,0 +1,217 @@
+# Evaluation report generated 20260429-145239
+# Source JSON: queries/sshd_simple.json
+# Log file input: data/logs/sshd
+# Log file resolved: data/logs/sshd
+# Model: gemini-3.1-pro-preview
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Templates: templates/sshd.json
+# Queries evaluated: 12
+
+ID: sshd_query_1 | type: where | query: Find log lines recording SSH authentication failures, including Failed password, Invalid user, and PAM authentication failure events.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '
+# Match lines indicating "Failed password", "Invalid user", or "PAM authentication failure" events
+/[Ff]ailed password/ || /[Ii]nvalid user/ || /[Aa]uthentication failure/ {
+    print $0
+}
+' data/logs/sshd
+  precision=0.9827 recall=1.0000 f1=0.9912 TP=2832 FP=50 FN=0 returned=2882 must=2832
+  may_precision=0.9827 may_recall=1.0000 may_f1=0.9912 may_TP=2832 may_FP=50 may_FN=0 may=2832
+  retries=0
+  input_tokens=15346 output_tokens=83
+  elapsed_seconds=21.92
+
+ID: sshd_query_2 | type: where | query: Find log lines showing successful SSH logins using password authentication.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Accepted password for /' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=636 FP=0 FN=0 returned=636 must=636
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=636 may_FP=0 may_FN=0 may=636
+  retries=0
+  input_tokens=15336 output_tokens=32
+  elapsed_seconds=13.83
+
+ID: sshd_query_3 | type: where | query: Find log lines showing successful SSH logins using public key authentication.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Accepted publickey/' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=207 FP=0 FN=0 returned=207 must=207
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=207 may_FP=0 may_FN=0 may=207
+  retries=0
+  input_tokens=15337 output_tokens=30
+  elapsed_seconds=38.53
+
+ID: sshd_query_4 | type: where | query: Find log lines where an SSH login was attempted with an invalid or unknown username.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/[Ii]nvalid user|[Uu]ser unknown|[Bb]ad username/' data/logs/sshd
+  precision=0.9567 recall=1.0000 f1=0.9779 TP=1327 FP=60 FN=0 returned=1387 must=1327
+  may_precision=0.9567 may_recall=1.0000 may_f1=0.9779 may_TP=1327 may_FP=60 may_FN=0 may=1327
+  retries=0
+  input_tokens=15341 output_tokens=45
+  elapsed_seconds=25.13
+
+ID: sshd_query_5 | type: where | query: Find log lines showing SSH session openings.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/session opened/' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=13244 FP=0 FN=0 returned=13244 must=13244
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=13244 may_FP=0 may_FN=0 may=13244
+  retries=0
+  input_tokens=15333 output_tokens=40
+  elapsed_seconds=11.29
+
+ID: sshd_query_6 | type: where | query: Find log lines showing SSH session closings.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/session closed/' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=12797 FP=0 FN=0 returned=12797 must=12797
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=12797 may_FP=0 may_FN=0 may=12797
+  retries=0
+  input_tokens=15334 output_tokens=29
+  elapsed_seconds=12.39
+
+ID: sshd_query_7 | type: where | query: Find log lines showing SSH network-level disconnection events.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Received disconnect from|Connection closed by|Connection reset by|Disconnected from|Closing connection to|Broken pipe/' data/logs/sshd
+  precision=0.9880 recall=1.0000 f1=0.9939 TP=164 FP=2 FN=0 returned=166 must=164
+  may_precision=0.9880 may_recall=1.0000 may_f1=0.9939 may_TP=164 may_FP=2 may_FN=0 may=164
+  retries=0
+  input_tokens=15336 output_tokens=49
+  elapsed_seconds=20.9
+
+ID: sshd_query_8 | type: where | query: Find log lines showing the SSH server starting and listening on a port.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Server listening on .* port|Starting sshd:/' data/logs/sshd
+  precision=0.9901 recall=1.0000 f1=0.9950 TP=399 FP=4 FN=0 returned=403 must=399
+  may_precision=0.9901 may_recall=1.0000 may_f1=0.9950 may_TP=399 may_FP=4 may_FN=0 may=399
+  retries=0
+  input_tokens=15339 output_tokens=47
+  elapsed_seconds=15.0
+
+ID: sshd_query_9 | type: where | query: Find log lines reporting deprecated SSH configuration options.
+  output_format_note=ignored output_format for query_type=where
+  command: awk '/Deprecated option/' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2023 FP=0 FN=0 returned=2023 must=2023
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=2023 may_FP=0 may_FN=0 may=2023
+  retries=0
+  input_tokens=15334 output_tokens=30
+  elapsed_seconds=9.99
+
+ID: sshd_select_1 | type: select | query: Find the source IP addresses or hostnames that caused SSH authentication failures (including Failed password, Invalid user, and unknown user attempts).
+  requested output format=source
+  requested output data type=string
+  command: awk '
+{
+    # Match sshd process and get the rest of the message
+    if (match($0, /sshd[^:]*\[[0-9]+\]: /)) {
+        msg = substr($0, RSTART + RLENGTH)
+        src = ""
+        
+        # Check if the message indicates an authentication failure
+        if (msg ~ /[Aa]uthentication failure/ || msg ~ /^Failed / || msg ~ /^Invalid user / || msg ~ /not allowed because/) {
+            # Iterate fields backwards to find the source IP/hostname
+            for (i=NF; i>=1; i--) {
+                if ($i ~ /^rhost=/) {
+                    src = substr($i, 7)
+                    break
+                } else if ($i == "from" && i < NF) {
+                    src = $(i+1)
+                    break
+                }
+            }
+        }
+        
+        # Only output if a source was successfully extracted
+        if (src != "") {
+            print src
+        }
+    }
+}' data/logs/sshd
+  precision=0.8617 recall=1.0000 f1=0.9257 TP=81 FP=13 FN=0 returned=94 must=81
+  may_precision=0.8617 may_recall=1.0000 may_f1=0.9257 may_TP=81 may_FP=13 may_FN=0 may=81
+  retries=0
+  input_tokens=15517 output_tokens=281
+  elapsed_seconds=130.48
+
+ID: sshd_select_2 | type: select | query: Find the usernames that were targeted in SSH authentication failure attempts (including Failed password, Invalid user, and unknown user attempts).
+  requested output format=username
+  requested output data type=string
+  command: awk '{
+    u = "";
+    # Check for PAM authentication failures
+    if ($0 ~ /[Aa]uthentication failure/) {
+        if (match($0, / user=[^ ]+/)) {
+            u = substr($0, RSTART+6, RLENGTH-6);
+        } else if (match($0, /Authentication failure for [^ ]+ from/)) {
+            m = substr($0, RSTART, RLENGTH);
+            split(m, a, " ");
+            u = a[4];
+        }
+    } 
+    # Check for invalid user Failed method
+    else if (match($0, /Failed [^ ]+ for invalid user [^ ]+/)) {
+        m = substr($0, RSTART, RLENGTH);
+        split(m, a, " ");
+        u = a[6];
+    } 
+    # Check for standard Failed method
+    else if (match($0, /Failed [^ ]+ for [^ ]+/)) {
+        m = substr($0, RSTART, RLENGTH);
+        split(m, a, " ");
+        u = a[4];
+    } 
+    # Check for Invalid user
+    else if (match($0, /Invalid user [^ ]+ from/)) {
+        m = substr($0, RSTART, RLENGTH);
+        split(m, a, " ");
+        u = a[3];
+    } 
+    # Check for bad username
+    else if (match($0, /bad username \[[^]]+\]/)) {
+        m = substr($0, RSTART, RLENGTH);
+        i1 = index(m, "[");
+        i2 = index(m, "]");
+        u = substr(m, i1+1, i2-i1-1);
+    } 
+    # Check for input_userauth_request invalid user
+    else if (match($0, /input_userauth_request: invalid user [^ ]+/)) {
+        m = substr($0, RSTART, RLENGTH);
+        split(m, a, " ");
+        u = a[4];
+    } 
+    # Check for User not allowed via config
+    else if (match($0, /User [^ ]+ from .* not allowed because not listed in/)) {
+        m = substr($0, RSTART, RLENGTH);
+        split(m, a, " ");
+        u = a[2];
+    }
+    
+    # Print if user was extracted
+    if (u != "") print u;
+}' data/logs/sshd
+  precision=0.9180 recall=1.0000 f1=0.9573 TP=56 FP=5 FN=0 returned=61 must=56
+  may_precision=0.9180 may_recall=1.0000 may_f1=0.9573 may_TP=56 may_FP=5 may_FN=0 may=56
+  retries=0
+  input_tokens=15515 output_tokens=639
+  elapsed_seconds=128.67
+
+ID: sshd_select_3 | type: select | query: Find the ports on which the SSH server was configured to listen.
+  requested output format=port
+  requested output data type=integer
+  command: awk '/Server listening on .* port [0-9]+/ || /FATAL ERROR: Creating listener failed: port [0-9]+/ || /error: Bind to port [0-9]+/ { for (i=1; i<=NF; i++) { if ($i == "port") { p = $(i+1); sub(/[^0-9]+$/, "", p); if (p ~ /^[0-9]+$/) { print p; break; } } } }' data/logs/sshd
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6 FP=0 FN=0 returned=6 must=6
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=6 may_FP=0 may_FN=0 may=6
+  retries=0
+  input_tokens=15504 output_tokens=129
+  elapsed_seconds=40.6
+
+# Macro Averages (where/select queries)
+# precision=0.9748 recall=1.0000 f1=0.9868
+# may_precision=0.9748 may_recall=1.0000 may_f1=0.9868
+# retries_total=0 retries_avg=0.00
+# total_input_tokens=184572 total_output_tokens=1434
+# total_elapsed=468.73s avg_elapsed=39.06s
+# Worst 5 queries by f1
+# 1. sshd_select_1 | type: select | f1=0.9257 | query: Find the source IP addresses or hostnames that caused SSH authentication failures (including Failed password, Invalid user, and unknown user attempts).
+# 2. sshd_select_2 | type: select | f1=0.9573 | query: Find the usernames that were targeted in SSH authentication failure attempts (including Failed password, Invalid user, and unknown user attempts).
+# 3. sshd_query_4 | type: where | f1=0.9779 | query: Find log lines where an SSH login was attempted with an invalid or unknown username.
+# 4. sshd_query_1 | type: where | f1=0.9912 | query: Find log lines recording SSH authentication failures, including Failed password, Invalid user, and PAM authentication failure events.
+# 5. sshd_query_7 | type: where | f1=0.9939 | query: Find log lines showing SSH network-level disconnection events.

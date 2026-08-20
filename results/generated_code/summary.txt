@@ -1,0 +1,22 @@
+# Macro F1 per (dataset, strategy) — matches Table 1 of the paper.
+# Computed from the per-query F1 scores in this folder.
+
+Dataset       Matr     Drain3   Freq     Rand     None   
+--------------------------------------------------------------
+Cron (S)      0.998  0.998  0.917  0.750  0.915
+Cron (C)      0.991  0.991  1.000  0.991  0.991
+SSH (S)       0.971  0.950  0.987  0.990  0.781
+SSH (C)       0.892  0.847  0.846  0.863  0.601
+Audit (S)     0.984  0.978  0.978  0.990  0.680
+Audit (C)     0.954  0.910  0.849  0.946  0.487
+DHCP (S)      0.944  0.989  0.919  0.891  0.916
+DHCP (C)      0.861  0.859  0.857  0.757  0.723
+Puppet (S)    0.945  0.951  0.875  0.856  0.772
+Puppet (C)    0.927  0.920  0.945  0.745  0.684
+
+Macro averages across datasets:
+  matryoshka    0.947
+  drain3        0.939
+  frequency     0.917
+  random-only   0.878
+  none          0.755

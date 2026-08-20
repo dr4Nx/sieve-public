@@ -1,0 +1,1352 @@
+{
+  "method": "Archived final Drain3-context scripts replayed once on decompressed original logs; stdout discarded; execution-only wall-clock timing.",
+  "all": {
+    "n_queries": 132,
+    "mean_execution_seconds": 1.175695333206518,
+    "median_execution_seconds": 0.5196334791835397,
+    "p95_execution_seconds": 4.520601249369791,
+    "mean_lines_per_second": 366080.2716926713,
+    "median_lines_per_second": 223106.99147911774,
+    "p05_lines_per_second": 58510.04239446236
+  },
+  "simple": {
+    "n_queries": 80,
+    "mean_execution_seconds": 0.9437184109643567,
+    "median_execution_seconds": 0.4916257362347096,
+    "p95_execution_seconds": 2.698117511463346,
+    "mean_lines_per_second": 457671.391666505,
+    "median_lines_per_second": 303795.4713233397,
+    "p05_lines_per_second": 86015.6391773143
+  },
+  "complex": {
+    "n_queries": 52,
+    "mean_execution_seconds": 1.5325829058867664,
+    "median_execution_seconds": 0.6632466001901776,
+    "p95_execution_seconds": 5.692176972446027,
+    "mean_lines_per_second": 225170.85634831164,
+    "median_lines_per_second": 143789.66788715415,
+    "p05_lines_per_second": 45490.32385240482
+  },
+  "per_query": [
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_1",
+      "lines": 76636,
+      "elapsed_seconds": 0.42425142554566264,
+      "lines_per_second": 180638.1673354014,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_2",
+      "lines": 76636,
+      "elapsed_seconds": 1.989646561909467,
+      "lines_per_second": 38517.393725673726,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_3",
+      "lines": 76636,
+      "elapsed_seconds": 1.282651538029313,
+      "lines_per_second": 59748.10595693419,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_4",
+      "lines": 76636,
+      "elapsed_seconds": 0.857523743994534,
+      "lines_per_second": 89368.95396390154,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_5",
+      "lines": 76636,
+      "elapsed_seconds": 0.12664656480774283,
+      "lines_per_second": 605117.0840388612,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_6",
+      "lines": 76636,
+      "elapsed_seconds": 0.6038668742403388,
+      "lines_per_second": 126908.76626807467,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_7",
+      "lines": 76636,
+      "elapsed_seconds": 1.0513704027980566,
+      "lines_per_second": 72891.53260929295,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "complex",
+      "query_id": "multiline_8",
+      "lines": 76636,
+      "elapsed_seconds": 2.2490553371608257,
+      "lines_per_second": 34074.75073367655,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_1",
+      "lines": 76636,
+      "elapsed_seconds": 0.5572909899055958,
+      "lines_per_second": 137515.2324156219,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_2",
+      "lines": 76636,
+      "elapsed_seconds": 0.890317487064749,
+      "lines_per_second": 86077.1591184377,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_3",
+      "lines": 76636,
+      "elapsed_seconds": 0.5633268211968243,
+      "lines_per_second": 136041.8093304733,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_4",
+      "lines": 76636,
+      "elapsed_seconds": 0.5923707205802202,
+      "lines_per_second": 129371.68792700613,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_5",
+      "lines": 76636,
+      "elapsed_seconds": 0.6245301151648164,
+      "lines_per_second": 122709.8552001378,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_6",
+      "lines": 76636,
+      "elapsed_seconds": 0.5341825629584491,
+      "lines_per_second": 143464.06137925744,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_7",
+      "lines": 76636,
+      "elapsed_seconds": 0.6512785106897354,
+      "lines_per_second": 117670.0885138046,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_8",
+      "lines": 76636,
+      "elapsed_seconds": 0.5631639319472015,
+      "lines_per_second": 136081.15799430295,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_query_9",
+      "lines": 76636,
+      "elapsed_seconds": 0.574741028714925,
+      "lines_per_second": 133340.05433952046,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_select_1",
+      "lines": 76636,
+      "elapsed_seconds": 0.2957681338302791,
+      "lines_per_second": 259108.37319606615,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_select_2",
+      "lines": 76636,
+      "elapsed_seconds": 0.5603354349732399,
+      "lines_per_second": 136768.0771494666,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "audit",
+      "tier": "simple",
+      "query_id": "audit_select_3",
+      "lines": 76636,
+      "elapsed_seconds": 0.5873481282033026,
+      "lines_per_second": 130477.98455479793,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_1",
+      "lines": 12547,
+      "elapsed_seconds": 0.0406955499202013,
+      "lines_per_second": 308313.8088710692,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_2",
+      "lines": 12547,
+      "elapsed_seconds": 0.052564102690666914,
+      "lines_per_second": 238699.0238155021,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_3",
+      "lines": 12547,
+      "elapsed_seconds": 0.062228403985500336,
+      "lines_per_second": 201628.18257276117,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_4",
+      "lines": 12547,
+      "elapsed_seconds": 0.14145347476005554,
+      "lines_per_second": 88700.54285540318,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_5",
+      "lines": 12547,
+      "elapsed_seconds": 0.09503285586833954,
+      "lines_per_second": 132028.02215459957,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_6",
+      "lines": 12547,
+      "elapsed_seconds": 0.11325889080762863,
+      "lines_per_second": 110781.58995315614,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_7",
+      "lines": 12547,
+      "elapsed_seconds": 0.06648292718455195,
+      "lines_per_second": 188725.14390304155,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "complex",
+      "query_id": "multiline_8",
+      "lines": 12547,
+      "elapsed_seconds": 0.11551655316725373,
+      "lines_per_second": 108616.46799514083,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_1",
+      "lines": 12547,
+      "elapsed_seconds": 0.053940479177981615,
+      "lines_per_second": 232608.2413654504,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_2",
+      "lines": 12547,
+      "elapsed_seconds": 0.0937016480602324,
+      "lines_per_second": 133903.72805326388,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_3",
+      "lines": 12547,
+      "elapsed_seconds": 0.0866032699123025,
+      "lines_per_second": 144879.05609921578,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_4",
+      "lines": 12547,
+      "elapsed_seconds": 0.04402924422174692,
+      "lines_per_second": 284969.6882555796,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_5",
+      "lines": 12547,
+      "elapsed_seconds": 0.06005167495459318,
+      "lines_per_second": 208936.72007462158,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_6",
+      "lines": 12547,
+      "elapsed_seconds": 0.0917833661660552,
+      "lines_per_second": 136702.32988949073,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_7",
+      "lines": 12547,
+      "elapsed_seconds": 0.03803127910941839,
+      "lines_per_second": 329912.6480574447,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_8",
+      "lines": 12547,
+      "elapsed_seconds": 0.08289333898574114,
+      "lines_per_second": 151363.18736247634,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_query_9",
+      "lines": 12547,
+      "elapsed_seconds": 0.03592049004510045,
+      "lines_per_second": 349299.24353054335,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_select_1",
+      "lines": 12547,
+      "elapsed_seconds": 0.08481366885825992,
+      "lines_per_second": 147936.05994062667,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_select_2",
+      "lines": 12547,
+      "elapsed_seconds": 0.06602126313373446,
+      "lines_per_second": 190044.83411025407,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "cron",
+      "tier": "simple",
+      "query_id": "cron_select_3",
+      "lines": 12547,
+      "elapsed_seconds": 0.05666941124945879,
+      "lines_per_second": 221406.92347707826,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_1",
+      "lines": 377653,
+      "elapsed_seconds": 5.149155712220818,
+      "lines_per_second": 73342.7033685721,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_2",
+      "lines": 377653,
+      "elapsed_seconds": 6.355869623832405,
+      "lines_per_second": 59417.99035397555,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_3",
+      "lines": 377653,
+      "elapsed_seconds": 2.61111375503242,
+      "lines_per_second": 144632.91737946935,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_4",
+      "lines": 377653,
+      "elapsed_seconds": 1.3836761978454888,
+      "lines_per_second": 272934.5207990428,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_5",
+      "lines": 377653,
+      "elapsed_seconds": 4.1277906447649,
+      "lines_per_second": 91490.34737964753,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_6",
+      "lines": 377653,
+      "elapsed_seconds": 1.4130511181429029,
+      "lines_per_second": 267260.6780824243,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_7",
+      "lines": 377653,
+      "elapsed_seconds": 1.7795714479871094,
+      "lines_per_second": 212215.6996995917,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_8",
+      "lines": 377653,
+      "elapsed_seconds": 0.7226263261400163,
+      "lines_per_second": 522611.7376836695,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_9",
+      "lines": 377653,
+      "elapsed_seconds": 0.9232519990764558,
+      "lines_per_second": 409046.501256182,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_10",
+      "lines": 377653,
+      "elapsed_seconds": 0.32603088254109025,
+      "lines_per_second": 1158335.054202737,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_11",
+      "lines": 377653,
+      "elapsed_seconds": 7.902248593047261,
+      "lines_per_second": 47790.57448689673,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_12",
+      "lines": 377653,
+      "elapsed_seconds": 4.092197955120355,
+      "lines_per_second": 92286.10251551062,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_13",
+      "lines": 377653,
+      "elapsed_seconds": 2.7919156048446894,
+      "lines_per_second": 135266.62458731746,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_14",
+      "lines": 377653,
+      "elapsed_seconds": 1.9575933567248285,
+      "lines_per_second": 192916.98079310823,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_15",
+      "lines": 377653,
+      "elapsed_seconds": 3.337113854009658,
+      "lines_per_second": 113167.55032083692,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_16",
+      "lines": 377653,
+      "elapsed_seconds": 1.8148312899284065,
+      "lines_per_second": 208092.621113502,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_18",
+      "lines": 377653,
+      "elapsed_seconds": 1.4340054062195122,
+      "lines_per_second": 263355.3530286972,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_19",
+      "lines": 377653,
+      "elapsed_seconds": 2.723507498856634,
+      "lines_per_second": 138664.20421406731,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_20",
+      "lines": 377653,
+      "elapsed_seconds": 2.641919988207519,
+      "lines_per_second": 142946.41839483895,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "complex",
+      "query_id": "multiline_21",
+      "lines": 377653,
+      "elapsed_seconds": 6.5792829361744225,
+      "lines_per_second": 57400.32822172403,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_1",
+      "lines": 377653,
+      "elapsed_seconds": 0.9138953466899693,
+      "lines_per_second": 413234.40519510093,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_2",
+      "lines": 377653,
+      "elapsed_seconds": 1.571443228982389,
+      "lines_per_second": 240322.3947482689,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_3",
+      "lines": 377653,
+      "elapsed_seconds": 4.4510008241049945,
+      "lines_per_second": 84846.76029596968,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_4",
+      "lines": 377653,
+      "elapsed_seconds": 0.37714006612077355,
+      "lines_per_second": 1001360.0620175481,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_5",
+      "lines": 377653,
+      "elapsed_seconds": 0.7762221009470522,
+      "lines_per_second": 486526.9869786412,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_6",
+      "lines": 377653,
+      "elapsed_seconds": 1.1040374818257987,
+      "lines_per_second": 342065.37931616005,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_7",
+      "lines": 377653,
+      "elapsed_seconds": 2.6058604950085282,
+      "lines_per_second": 144924.488752712,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_8",
+      "lines": 377653,
+      "elapsed_seconds": 0.17814258392900229,
+      "lines_per_second": 2119947.9185196473,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_9",
+      "lines": 377653,
+      "elapsed_seconds": 1.231725804042071,
+      "lines_per_second": 306604.7644375735,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_query_10",
+      "lines": 377653,
+      "elapsed_seconds": 1.1209641201421618,
+      "lines_per_second": 336900.16764506756,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_1",
+      "lines": 377653,
+      "elapsed_seconds": 0.9867140538990498,
+      "lines_per_second": 382738.0369294279,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_2",
+      "lines": 377653,
+      "elapsed_seconds": 0.8474728399887681,
+      "lines_per_second": 445622.54054655624,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_3",
+      "lines": 377653,
+      "elapsed_seconds": 0.2527019693516195,
+      "lines_per_second": 1494460.0588945895,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_4",
+      "lines": 377653,
+      "elapsed_seconds": 0.9506483869627118,
+      "lines_per_second": 397258.3398648454,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_5",
+      "lines": 377653,
+      "elapsed_seconds": 0.5626063579693437,
+      "lines_per_second": 671256.189430725,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_6",
+      "lines": 377653,
+      "elapsed_seconds": 0.3157078642398119,
+      "lines_per_second": 1196210.303184385,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "dhcp_select_7",
+      "lines": 377653,
+      "elapsed_seconds": 7.51183226890862,
+      "lines_per_second": 50274.41860797413,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "simple_1",
+      "lines": 377653,
+      "elapsed_seconds": 0.925243865698576,
+      "lines_per_second": 408165.905228526,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "simple_2",
+      "lines": 377653,
+      "elapsed_seconds": 1.1607517949305475,
+      "lines_per_second": 325352.07065744535,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "simple_3",
+      "lines": 377653,
+      "elapsed_seconds": 0.3602759060449898,
+      "lines_per_second": 1048232.7395849786,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "complex_1",
+      "lines": 377653,
+      "elapsed_seconds": 0.6196482786908746,
+      "lines_per_second": 609463.4859599129,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "complex_2",
+      "lines": 377653,
+      "elapsed_seconds": 0.7772195758298039,
+      "lines_per_second": 485902.58370267646,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "complex_3",
+      "lines": 377653,
+      "elapsed_seconds": 1.245370197109878,
+      "lines_per_second": 303245.57378714916,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "vague_1",
+      "lines": 377653,
+      "elapsed_seconds": 16.200526650995016,
+      "lines_per_second": 23311.1557504092,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "vague_2",
+      "lines": 377653,
+      "elapsed_seconds": 4.605668435804546,
+      "lines_per_second": 81997.43539159681,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "numerical_1",
+      "lines": 377653,
+      "elapsed_seconds": 2.251837578602135,
+      "lines_per_second": 167708.80972438262,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "numerical_2",
+      "lines": 377653,
+      "elapsed_seconds": 1.4529028129763901,
+      "lines_per_second": 259929.9806064433,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "time_1",
+      "lines": 377653,
+      "elapsed_seconds": 0.18547956878319383,
+      "lines_per_second": 2036089.4867155787,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "time_2",
+      "lines": 377653,
+      "elapsed_seconds": 1.7711119051091373,
+      "lines_per_second": 213229.32724385292,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "select_1",
+      "lines": 377653,
+      "elapsed_seconds": 0.19775308389216661,
+      "lines_per_second": 1909719.9020467948,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "select_2",
+      "lines": 377653,
+      "elapsed_seconds": 1.1111414297483861,
+      "lines_per_second": 339878.42581436114,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "dhcp",
+      "tier": "simple",
+      "query_id": "select_3",
+      "lines": 377653,
+      "elapsed_seconds": 1.8341109589673579,
+      "lines_per_second": 205905.2088171516,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_1",
+      "lines": 156880,
+      "elapsed_seconds": 0.4314747890457511,
+      "lines_per_second": 363590.1887731507,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_2",
+      "lines": 156880,
+      "elapsed_seconds": 0.24234408978372812,
+      "lines_per_second": 647344.0311253405,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_3",
+      "lines": 156880,
+      "elapsed_seconds": 0.39723760867491364,
+      "lines_per_second": 394927.35978175094,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_4",
+      "lines": 156880,
+      "elapsed_seconds": 0.3578379130922258,
+      "lines_per_second": 438410.7839338064,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_5",
+      "lines": 156880,
+      "elapsed_seconds": 3.675820521079004,
+      "lines_per_second": 42678.90641024804,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_6",
+      "lines": 156880,
+      "elapsed_seconds": 2.3978099981322885,
+      "lines_per_second": 65426.36827863658,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_7",
+      "lines": 156880,
+      "elapsed_seconds": 0.3596688359975815,
+      "lines_per_second": 436179.0188601575,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "complex",
+      "query_id": "multiline_8",
+      "lines": 156880,
+      "elapsed_seconds": 0.396286859177053,
+      "lines_per_second": 395874.8476439114,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_1",
+      "lines": 156880,
+      "elapsed_seconds": 1.7723005269654095,
+      "lines_per_second": 88517.71898336848,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_2",
+      "lines": 156880,
+      "elapsed_seconds": 0.6728487061336637,
+      "lines_per_second": 233157.91287088432,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_3",
+      "lines": 156880,
+      "elapsed_seconds": 0.3454708061181009,
+      "lines_per_second": 454104.9409146595,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_4",
+      "lines": 156880,
+      "elapsed_seconds": 0.10904568526893854,
+      "lines_per_second": 1438663.066888782,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_5",
+      "lines": 156880,
+      "elapsed_seconds": 0.4739053240045905,
+      "lines_per_second": 331036.58484849683,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_6",
+      "lines": 156880,
+      "elapsed_seconds": 0.09515865612775087,
+      "lines_per_second": 1648615.1274497611,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_7",
+      "lines": 156880,
+      "elapsed_seconds": 0.11681476794183254,
+      "lines_per_second": 1342980.8813053311,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_8",
+      "lines": 156880,
+      "elapsed_seconds": 0.47816707706078887,
+      "lines_per_second": 328086.159683587,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_query_9",
+      "lines": 156880,
+      "elapsed_seconds": 0.9398623816668987,
+      "lines_per_second": 166918.05423871154,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_select_1",
+      "lines": 156880,
+      "elapsed_seconds": 0.2978207068517804,
+      "lines_per_second": 526759.880662281,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_select_2",
+      "lines": 156880,
+      "elapsed_seconds": 0.12519510788843036,
+      "lines_per_second": 1253084.107246476,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "puppet",
+      "tier": "simple",
+      "query_id": "puppet_select_3",
+      "lines": 156880,
+      "elapsed_seconds": 0.5050843954086304,
+      "lines_per_second": 310601.55773190886,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_1",
+      "lines": 35329,
+      "elapsed_seconds": 0.32463560719043016,
+      "lines_per_second": 108826.63274603801,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_2",
+      "lines": 35329,
+      "elapsed_seconds": 0.41756612015888095,
+      "lines_per_second": 84606.95993860222,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_3",
+      "lines": 35329,
+      "elapsed_seconds": 0.1040029488503933,
+      "lines_per_second": 339692.29132935684,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_4",
+      "lines": 35329,
+      "elapsed_seconds": 0.41387977497652173,
+      "lines_per_second": 85360.53737345373,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_5",
+      "lines": 35329,
+      "elapsed_seconds": 0.12211468582972884,
+      "lines_per_second": 289310.00198666647,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_6",
+      "lines": 35329,
+      "elapsed_seconds": 0.4588083988055587,
+      "lines_per_second": 77001.64184433839,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_7",
+      "lines": 35329,
+      "elapsed_seconds": 0.06204538093879819,
+      "lines_per_second": 569405.803710814,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "complex",
+      "query_id": "multiline_8",
+      "lines": 35329,
+      "elapsed_seconds": 0.19377817679196596,
+      "lines_per_second": 182316.71174163272,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_1",
+      "lines": 35329,
+      "elapsed_seconds": 0.18375353887677193,
+      "lines_per_second": 192262.9638370785,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_2",
+      "lines": 35329,
+      "elapsed_seconds": 0.048581868410110474,
+      "lines_per_second": 727205.4607238533,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_3",
+      "lines": 35329,
+      "elapsed_seconds": 0.045992666855454445,
+      "lines_per_second": 768144.1937479257,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_4",
+      "lines": 35329,
+      "elapsed_seconds": 0.20939532900229096,
+      "lines_per_second": 168719.1408152828,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_5",
+      "lines": 35329,
+      "elapsed_seconds": 0.05268211988732219,
+      "lines_per_second": 670607.0309160401,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_6",
+      "lines": 35329,
+      "elapsed_seconds": 0.15715253818780184,
+      "lines_per_second": 224807.05948115722,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_7",
+      "lines": 35329,
+      "elapsed_seconds": 0.20788265811279416,
+      "lines_per_second": 169946.8359733547,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_8",
+      "lines": 35329,
+      "elapsed_seconds": 0.047099240124225616,
+      "lines_per_second": 750097.0271880976,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_query_9",
+      "lines": 35329,
+      "elapsed_seconds": 0.031040186993777752,
+      "lines_per_second": 1138169.6897342138,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_select_1",
+      "lines": 35329,
+      "elapsed_seconds": 0.1139737656340003,
+      "lines_per_second": 309974.8420478683,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_select_2",
+      "lines": 35329,
+      "elapsed_seconds": 0.11608193721622229,
+      "lines_per_second": 304345.3688595302,
+      "status": "ok",
+      "stderr": ""
+    },
+    {
+      "log": "sshd",
+      "tier": "simple",
+      "query_id": "sshd_select_3",
+      "lines": 35329,
+      "elapsed_seconds": 0.10589205101132393,
+      "lines_per_second": 333632.2194403617,
+      "status": "ok",
+      "stderr": ""
+    }
+  ]
+}

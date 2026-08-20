@@ -1,0 +1,39 @@
+# Human baseline report for sshd_complex
+# Baseline scripts: human_baselines/sshd_complex
+# Log file: data/logs/sshd
+# Queries evaluated: 8
+
+ID: multiline_1 | type: select | query: For each source IP that attempted SSH authentication and failed one or more times, count the total number of failed authentication events and the number of distinct usernames tried. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+  script: human_baselines/sshd_complex/multiline_1.py
+  precision=0.8989 recall=0.9877 f1=0.9412 TP=80 FP=9 FN=1 returned=89 must=81
+
+ID: multiline_2 | type: select | query: Find source IPs that attempted SSH authentication and failed 10 or more times within any 5-minute window. Return the source IP and the peak failure count within a single 5-minute window. Exclude connection-level events where no authentication was attempted.
+  script: human_baselines/sshd_complex/multiline_2.py
+  precision=0.2778 recall=0.3125 f1=0.2941 TP=5 FP=13 FN=11 returned=18 must=16
+
+ID: multiline_3 | type: select | query: Find source IPs that attempted SSH authentication and failed using 5 or more distinct usernames. Return the source IP and the number of distinct usernames tried. Exclude connection-level events where no authentication was attempted.
+  script: human_baselines/sshd_complex/multiline_3.py
+  precision=1.0000 recall=0.9000 f1=0.9474 TP=9 FP=0 FN=1 returned=9 must=10
+
+ID: multiline_4 | type: select | query: Find users who had successful SSH logins from two different source IP addresses within 60 seconds of each other. Assume year 2000 for timestamps. Return the username and the two IP addresses.
+  script: human_baselines/sshd_complex/multiline_4.py
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=4 FN=1 returned=4 must=1
+
+ID: multiline_5 | type: select | query: For each host, count SSH session opens and session closes, and compute the number of unclosed sessions (opens minus closes).
+  script: human_baselines/sshd_complex/multiline_5.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=123 FP=0 FN=0 returned=123 must=123
+
+ID: multiline_6 | type: select | query: For each source IP, count the number of failed SSH authentication events that specifically targeted the root account. Exclude connection-level events where no authentication was attempted.
+  script: human_baselines/sshd_complex/multiline_6.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=45 FP=0 FN=0 returned=45 must=45
+
+ID: multiline_7 | type: select | query: For each host and username with successful SSH logins, count the total logins and the number of distinct key fingerprints used. Only count 'Accepted' login events, not session events.
+  script: human_baselines/sshd_complex/multiline_7.py
+  precision=0.8333 recall=0.6944 f1=0.7576 TP=25 FP=5 FN=11 returned=30 must=36
+
+ID: multiline_8 | type: select | query: For each host, count the number of distinct source IPs that attempted SSH authentication and failed, and the number of distinct source IPs with successful SSH logins. Exclude connection-level events (port scans, protocol probes, connection resets) where no authentication was attempted.
+  script: human_baselines/sshd_complex/multiline_8.py
+  precision=0.9848 recall=1.0000 f1=0.9924 TP=65 FP=1 FN=0 returned=66 must=65
+
+# Macro Averages
+# precision=0.7494 recall=0.7368 f1=0.7416

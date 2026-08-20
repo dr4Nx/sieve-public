@@ -1,0 +1,55 @@
+# Human baseline report for sshd_simple
+# Baseline scripts: human_baselines/sshd_simple
+# Log file: data/logs/sshd
+# Queries evaluated: 12
+
+ID: sshd_query_1 | type: where | query: Find log lines recording SSH authentication failures, including Failed password, Invalid user, and PAM authentication failure events.
+  script: human_baselines/sshd_simple/sshd_query_1.sh
+  precision=0.9909 recall=1.0000 f1=0.9954 TP=2832 FP=26 FN=0 returned=2858 must=2832
+
+ID: sshd_query_2 | type: where | query: Find log lines showing successful SSH logins using password authentication.
+  script: human_baselines/sshd_simple/sshd_query_2.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=636 FP=0 FN=0 returned=636 must=636
+
+ID: sshd_query_3 | type: where | query: Find log lines showing successful SSH logins using public key authentication.
+  script: human_baselines/sshd_simple/sshd_query_3.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=207 FP=0 FN=0 returned=207 must=207
+
+ID: sshd_query_4 | type: where | query: Find log lines where an SSH login was attempted with an invalid or unknown username.
+  script: human_baselines/sshd_simple/sshd_query_4.sh
+  precision=0.9903 recall=1.0000 f1=0.9951 TP=1327 FP=13 FN=0 returned=1340 must=1327
+
+ID: sshd_query_5 | type: where | query: Find log lines showing SSH session openings.
+  script: human_baselines/sshd_simple/sshd_query_5.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=13244 FP=0 FN=0 returned=13244 must=13244
+
+ID: sshd_query_6 | type: where | query: Find log lines showing SSH session closings.
+  script: human_baselines/sshd_simple/sshd_query_6.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=12797 FP=0 FN=0 returned=12797 must=12797
+
+ID: sshd_query_7 | type: where | query: Find log lines showing SSH client disconnections or connection closures.
+  script: human_baselines/sshd_simple/sshd_query_7.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=164 FP=0 FN=0 returned=164 must=164
+
+ID: sshd_query_8 | type: where | query: Find log lines showing the SSH server starting and listening on a port.
+  script: human_baselines/sshd_simple/sshd_query_8.sh
+  precision=0.9950 recall=1.0000 f1=0.9975 TP=399 FP=2 FN=0 returned=401 must=399
+
+ID: sshd_query_9 | type: where | query: Find log lines reporting deprecated SSH configuration options.
+  script: human_baselines/sshd_simple/sshd_query_9.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=2023 FP=0 FN=0 returned=2023 must=2023
+
+ID: sshd_select_1 | type: select | query: Find the source IP addresses or hostnames that caused SSH authentication failures (including Failed password, Invalid user, and unknown user attempts).
+  script: human_baselines/sshd_simple/sshd_select_1.py
+  precision=1.0000 recall=0.9753 f1=0.9875 TP=79 FP=0 FN=2 returned=79 must=81
+
+ID: sshd_select_2 | type: select | query: Find the usernames that were targeted in SSH authentication failure attempts (including Failed password, Invalid user, and unknown user attempts).
+  script: human_baselines/sshd_simple/sshd_select_2.py
+  precision=1.0000 recall=0.9107 f1=0.9533 TP=51 FP=0 FN=5 returned=51 must=56
+
+ID: sshd_select_3 | type: select | query: Find the ports on which the SSH server was configured to listen.
+  script: human_baselines/sshd_simple/sshd_select_3.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=6 FP=0 FN=0 returned=6 must=6
+
+# Macro Averages
+# precision=0.9980 recall=0.9905 f1=0.9941

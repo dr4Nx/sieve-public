@@ -1,0 +1,55 @@
+# Human baseline report for puppet_simple
+# Baseline scripts: human_baselines/puppet_simple
+# Log file: data/logs/puppet
+# Queries evaluated: 12
+
+ID: puppet_query_1 | type: where | query: Find log lines indicating Puppet runs were disabled by an administrative action.
+  script: human_baselines/puppet_simple/puppet_query_1.sh
+  precision=0.9802 recall=1.0000 f1=0.9900 TP=198 FP=4 FN=0 returned=202 must=198
+
+ID: puppet_query_2 | type: where | query: Find log lines indicating Puppet execution was re-enabled after being disabled.
+  script: human_baselines/puppet_simple/puppet_query_2.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=66 FP=0 FN=0 returned=66 must=66
+
+ID: puppet_query_3 | type: where | query: Find log lines where Puppet says it could not fetch the node definition it needed.
+  script: human_baselines/puppet_simple/puppet_query_3.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=59 FP=0 FN=0 returned=59 must=59
+
+ID: puppet_query_4 | type: where | query: Find log lines showing the agent could not retrieve its catalog from a remote source.
+  script: human_baselines/puppet_simple/puppet_query_4.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=101 FP=0 FN=0 returned=101 must=101
+
+ID: puppet_query_5 | type: where | query: Find log lines showing the agent fell back to a cached catalog after a remote problem.
+  script: human_baselines/puppet_simple/puppet_query_5.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=66 FP=0 FN=0 returned=66 must=66
+
+ID: puppet_query_6 | type: where | query: Find log lines showing Puppet could not deliver its report back to a remote service.
+  script: human_baselines/puppet_simple/puppet_query_6.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=33 FP=0 FN=0 returned=33 must=33
+
+ID: puppet_query_7 | type: where | query: Find log lines showing resources were skipped because a dependency chain had already failed.
+  script: human_baselines/puppet_simple/puppet_query_7.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=38356 FP=0 FN=0 returned=38356 must=38356
+
+ID: puppet_query_8 | type: where | query: Find log lines where Puppet reports that a needed command could not be found.
+  script: human_baselines/puppet_simple/puppet_query_8.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=118 FP=0 FN=0 returned=118 must=118
+
+ID: puppet_query_9 | type: where | query: Find log lines showing certificate validation or trust failures during remote Puppet communication.
+  script: human_baselines/puppet_simple/puppet_query_9.sh
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=128 FP=0 FN=0 returned=128 must=128
+
+ID: puppet_select_1 | type: select | query: Find the hosts that experienced remote catalog retrieval failures.
+  script: human_baselines/puppet_simple/puppet_select_1.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=18 FP=0 FN=0 returned=18 must=18
+
+ID: puppet_select_2 | type: select | query: Find the configuration versions that were applied during Puppet runs.
+  script: human_baselines/puppet_simple/puppet_select_2.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=93 FP=0 FN=0 returned=93 must=93
+
+ID: puppet_select_3 | type: select | query: Find the resource identifiers that were skipped because of failed dependencies.
+  script: human_baselines/puppet_simple/puppet_select_3.py
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=1691 FP=0 FN=0 returned=1691 must=1691
+
+# Macro Averages
+# precision=0.9983 recall=1.0000 f1=0.9992

@@ -1,0 +1,14 @@
+# OpenAI GPT-5.4 (Matryoshka) macro F1 — matches Table 'GPT-5.4 vs Gemini' Sieve column.
+
+Dataset       GPT-5.4
+------------------------------
+Audit (S)     0.913
+Audit (C)     0.846
+Cron (S)      0.998
+Cron (C)      0.995
+DHCP (S)      0.975
+DHCP (C)      0.467
+Puppet (S)    0.914
+Puppet (C)    0.638
+SSH (S)       0.766
+SSH (C)       0.871

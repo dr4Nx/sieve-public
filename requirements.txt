@@ -1,0 +1,5 @@
+google-genai>=0.3.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+drain3>=0.9.10
+scipy>=1.10.0

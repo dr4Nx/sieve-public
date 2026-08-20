@@ -1,0 +1,30 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.DS_Store
+
+# Local outputs
+eval/
+output/
+templates/
+extracted_templates/
+results/*
+!results/matryoshka_comparison/
+!results/generated_code/
+!results/openai_gpt54/
+!results/prompt_ablation/
+!results/language_compare/
+!results/human_baseline/
+!results/operational_overhead/
+*.log
+
+# Decompressed log files (shipped as .gz in data/logs/)
+data/logs/audit
+data/logs/cron
+data/logs/dhcp
+data/logs/puppet
+data/logs/sshd

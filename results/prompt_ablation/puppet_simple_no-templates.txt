@@ -1,0 +1,422 @@
+# Evaluation report generated 20260429-123855
+# Source JSON: queries/puppet_simple.json
+# Log file input: data/logs/puppet
+# Log file resolved: data/logs/puppet
+# Model: gemini-3.1-pro-preview
+# Language: python
+# Sample size: 100
+# Max retries: 4
+# Timeout: 600
+# Queries evaluated: 12
+
+ID: puppet_query_1 | type: where | query: Find log lines indicating Puppet runs were disabled by an administrative action.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+import re
+
+def process_file(file_path):
+    # Pattern to match log lines indicating Puppet is administratively disabled
+    # Common messages include: "Skipping run of Puppet configuration client; administratively disabled"
+    pattern = re.compile(r'(?i)(administratively\s+disabled|disabled\s+by\s+(?:an\s+)?administrative\s+action)')
+    
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        process_file(sys.argv[1])
+  precision=1.0000 recall=0.6212 f1=0.7664 TP=123 FP=0 FN=75 returned=123 must=198
+  may_precision=1.0000 may_recall=0.6212 may_f1=0.7664 may_TP=123 may_FP=0 may_FN=75 may=198
+  retries=0
+  input_tokens=8132 output_tokens=245
+  elapsed_seconds=16.37
+
+ID: puppet_query_2 | type: where | query: Find log lines indicating Puppet execution was re-enabled after being disabled.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_logs(file_path):
+    # Regex to match log entries that indicate Puppet was enabled.
+    # Typically, Puppet logs "Enabling Puppet." when the lock is removed.
+    pattern = re.compile(r'(?i)\b(?:enabling puppet|puppet (?:execution |run |agent )?(?:was )?(?:re-)?enabled)\b')
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=66 FP=0 FN=0 returned=66 must=66
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=66 may_FP=0 may_FN=0 may=66
+  retries=1
+  input_tokens=16299 output_tokens=540
+  elapsed_seconds=67.7
+
+ID: puppet_query_3 | type: where | query: Find log lines where Puppet says it could not fetch the node definition it needed.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def process_logs(filepath):
+    # Regex to robustly parse the syslog-like format typically used by Puppet
+    log_pattern = re.compile(
+        r'^(?P<timestamp>[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+'
+        r'(?P<host>\S+)\s+'
+        r'(?P<process>[^:\[\]]+)'
+        r'(?:\[(?P<pid>\d+)\])?:\s+'
+        r'(?P<message>.*)$'
+    )
+
+    # Target pattern for the specific Puppet error
+    target_pattern = re.compile(r'(?i)could not (?:fetch|retrieve|find).*node definition')
+
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                original_line = line.strip('\r\n')
+                if not original_line:
+                    continue
+                
+                match = log_pattern.match(original_line)
+                if match:
+                    # Build explicit intermediate record
+                    record = match.groupdict()
+                    if target_pattern.search(record['message']):
+                        print(original_line)
+                else:
+                    # Fallback for log lines that might not strictly match the syslog format
+                    if target_pattern.search(original_line):
+                        print(original_line)
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=0 FN=59 returned=0 must=59
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=0 may_FN=59 may=59
+  retries=0
+  input_tokens=8135 output_tokens=438
+  elapsed_seconds=29.82
+
+ID: puppet_query_4 | type: where | query: Find log lines showing the agent could not retrieve its catalog from a remote source.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+        
+    log_file = sys.argv[1]
+    # Puppet usually logs: "Could not retrieve catalog from remote server: ..."
+    # We use a case-insensitive regex to catch variations of this error.
+    pattern = re.compile(r'(?:could not|failed to) retrieve.*catalog.*remote', re.IGNORECASE)
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=101 FP=0 FN=0 returned=101 must=101
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=101 may_FP=0 may_FN=0 may=101
+  retries=0
+  input_tokens=8135 output_tokens=216
+  elapsed_seconds=20.36
+
+ID: puppet_query_5 | type: where | query: Find log lines showing the agent fell back to a cached catalog after a remote problem.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def filter_logs(file_path):
+    # Match "using cached catalog" which is Puppet's standard message 
+    # for falling back to cache after failing to retrieve it from the remote master.
+    # We use a negative lookbehind to avoid matching "Not using..." just in case.
+    pattern = re.compile(r'(?<!not )using cached catalog', re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        filter_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=66 FP=0 FN=0 returned=66 must=66
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=66 may_FP=0 may_FN=0 may=66
+  retries=0
+  input_tokens=8136 output_tokens=217
+  elapsed_seconds=21.81
+
+ID: puppet_query_6 | type: where | query: Find log lines showing Puppet could not deliver its report back to a remote service.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Matches variations of "Could not send report", "Failed to submit report", etc.
+    # as well as specific Puppet error messages like "Report processor failed".
+    pattern = re.compile(
+        r'(?:could not|failed to)\s+(?:send|submit|deliver|upload|post)\s+(?:its\s+|a\s+|the\s+)?report|'
+        r'report processor failed',
+        re.IGNORECASE
+    )
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if pattern.search(line):
+                    sys.stdout.write(line)
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=33 FP=0 FN=0 returned=33 must=33
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=33 may_FP=0 may_FN=0 may=33
+  retries=0
+  input_tokens=8135 output_tokens=254
+  elapsed_seconds=25.68
+
+ID: puppet_query_7 | type: where | query: Find log lines showing resources were skipped because a dependency chain had already failed.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    
+    # Regex to match lines indicating a resource was skipped due to failed dependencies
+    pattern = re.compile(r'(Skipping because of failed dependencies|Dependency\s+.*?\s+has failures:\s*true)', re.IGNORECASE)
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception as e:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=0.3399 recall=1.0000 f1=0.5073 TP=38356 FP=74502 FN=0 returned=112858 must=38356
+  may_precision=0.3399 may_recall=1.0000 may_f1=0.5073 may_TP=38356 may_FP=74502 may_FN=0 may=38356
+  retries=0
+  input_tokens=8134 output_tokens=199
+  elapsed_seconds=17.74
+
+ID: puppet_query_8 | type: where | query: Find log lines where Puppet reports that a needed command could not be found.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    
+    log_file = sys.argv[1]
+    
+    # Regex to match common "command not found" errors reported by Puppet or shell
+    missing_cmd_pattern = re.compile(r'(command not found|could not find command|executable not found)', re.IGNORECASE)
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                lower_line = line.lower()
+                # Check if it's a Puppet log line (e.g., process name is puppet or puppet-agent)
+                if 'puppet' in lower_line:
+                    if missing_cmd_pattern.search(line):
+                        print(line, end='')
+    except Exception as e:
+        sys.stderr.write(f"Error reading file: {e}\n")
+
+if __name__ == '__main__':
+    main()
+  precision=0.9916 recall=1.0000 f1=0.9958 TP=118 FP=1 FN=0 returned=119 must=118
+  may_precision=0.9916 may_recall=1.0000 may_f1=0.9958 may_TP=118 may_FP=1 may_FN=0 may=118
+  retries=0
+  input_tokens=8134 output_tokens=278
+  elapsed_seconds=17.97
+
+ID: puppet_query_9 | type: where | query: Find log lines showing certificate validation or trust failures during remote Puppet communication.
+  output_format_note=ignored output_format for query_type=where
+  command: import sys
+import gzip
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    
+    file_path = sys.argv[1]
+    pattern = re.compile(
+        r"(?i)("
+        r"certificate verify failed|"
+        r"certificate signed by unknown authority|"
+        r"unable to get local issuer certificate|"
+        r"ssl certificate problem|"
+        r"certificate revoked|"
+        r"certificate validation|"
+        r"did not match server certificate|"
+        r"certificate unknown|"
+        r"bad certificate|"
+        r"unknown ca|"
+        r"trust anchor|"
+        r"verify_peer|"
+        r"certificate.*expired|"
+        r"certificate is not yet valid|"
+        r"untrusted certificate"
+        r")"
+    )
+
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if pattern.search(line):
+                    print(line, end='')
+    except Exception:
+        pass
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=128 FP=0 FN=0 returned=128 must=128
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=128 may_FP=0 may_FN=0 may=128
+  retries=0
+  input_tokens=8133 output_tokens=337
+  elapsed_seconds=30.07
+
+ID: puppet_select_1 | type: select | query: Find the hosts that experienced remote catalog retrieval failures.
+  requested output format=host
+  requested output data type=string
+  command: import sys
+import re
+import gzip
+
+def process_logs(file_path):
+    # Robust regex to parse standard syslog (RFC 3164) and ISO 8601 (RFC 5424) formats
+    # to extract the timestamp, host, and the rest of the log line.
+    log_pattern = re.compile(
+        r'^(?P<timestamp>[A-Z][a-z]{2}\s+\d+\s+(?:\d{4}\s+)?\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2})?|'
+        r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?[A-Za-z0-9:+-]*)\s+'
+        r'(?P<host>\S+)\s+'
+        r'(?P<rest>.*)'
+    )
+    
+    opener = gzip.open if file_path.endswith('.gz') else open
+    with opener(file_path, 'rt', encoding='utf-8', errors='replace') as f:
+        for line in f:
+            match = log_pattern.match(line)
+            if match:
+                host = match.group('host')
+                rest = match.group('rest')
+                # Look for the specific puppet remote catalog retrieval failure messages
+                if 'Could not retrieve catalog' in rest or 'Failed to retrieve catalog' in rest:
+                    print(host)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        process_logs(sys.argv[1])
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=18 FP=0 FN=0 returned=18 must=18
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=18 may_FP=0 may_FN=0 may=18
+  retries=0
+  input_tokens=8295 output_tokens=435
+  elapsed_seconds=33.7
+
+ID: puppet_select_2 | type: select | query: Find the configuration versions that were applied during Puppet runs.
+  requested output format=configuration_version
+  requested output data type=string
+  command: import sys
+import re
+
+def main():
+    if len(sys.argv) < 2:
+        return
+    file_path = sys.argv[1]
+    
+    # Matches logs like: Applying configuration version '1384174469'
+    # Captures the version string, handling optional quotes.
+    pattern = re.compile(r"Applying configuration version ['\"]?([^'\"\n]+)['\"]?")
+    
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            match = pattern.search(line)
+            if match:
+                print(match.group(1))
+
+if __name__ == '__main__':
+    main()
+  precision=1.0000 recall=1.0000 f1=1.0000 TP=93 FP=0 FN=0 returned=93 must=93
+  may_precision=1.0000 may_recall=1.0000 may_f1=1.0000 may_TP=93 may_FP=0 may_FN=0 may=93
+  retries=0
+  input_tokens=8300 output_tokens=195
+  elapsed_seconds=12.53
+
+ID: puppet_select_3 | type: select | query: Find the resource identifiers that were skipped because of failed dependencies.
+  requested output format=resource_identifier
+  requested output data type=string
+  command: import sys
+import re
+
+def extract_skipped_resources(filepath):
+    pattern = re.compile(r"(\([^)]+\))\s+(?:Skipping because of failed dependencies|Dependency\s+.*?\s+has failures:\s+true)")
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    print(match.group(1))
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        extract_skipped_resources(sys.argv[1])
+  precision=0.0000 recall=0.0000 f1=0.0000 TP=0 FP=1691 FN=1691 returned=1691 must=1691
+  may_precision=0.0000 may_recall=0.0000 may_f1=0.0000 may_TP=0 may_FP=1691 may_FN=1691 may=1691
+  retries=0
+  input_tokens=8301 output_tokens=186
+  elapsed_seconds=35.63
+
+# Macro Averages (where/select queries)
+# precision=0.7776 recall=0.8018 f1=0.7725
+# may_precision=0.7776 may_recall=0.8018 may_f1=0.7725
+# retries_total=1 retries_avg=0.08
+# total_input_tokens=106269 total_output_tokens=3540
+# total_elapsed=329.38s avg_elapsed=27.45s
+# Worst 5 queries by f1
+# 1. puppet_query_3 | type: where | f1=0.0000 | query: Find log lines where Puppet says it could not fetch the node definition it needed.
+# 2. puppet_select_3 | type: select | f1=0.0000 | query: Find the resource identifiers that were skipped because of failed dependencies.
+# 3. puppet_query_7 | type: where | f1=0.5073 | query: Find log lines showing resources were skipped because a dependency chain had already failed.
+# 4. puppet_query_1 | type: where | f1=0.7664 | query: Find log lines indicating Puppet runs were disabled by an administrative action.
+# 5. puppet_query_8 | type: where | f1=0.9958 | query: Find log lines where Puppet reports that a needed command could not be found.
